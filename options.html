@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Claude Token Tracker — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="page-header">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" fill="#D4670F"/>
+        <rect x="7"  y="14" width="3" height="4" rx="1" fill="white" opacity="0.9"/>
+        <rect x="10.5" y="10" width="3" height="8" rx="1" fill="white" opacity="0.9"/>
+        <rect x="14" y="7"  width="3" height="11" rx="1" fill="white" opacity="0.9"/>
+      </svg>
+      <div>
+        <h1>Claude Token Tracker</h1>
+        <p class="subtitle">Settings &amp; Data</p>
+      </div>
+    </header>
+
+    <!-- ── Limits ─────────────────────────────────────────────────────────── -->
+    <section class="card">
+      <h2>Token Limits</h2>
+      <p class="hint">Anthropic doesn't expose exact plan limits. Set values that match your subscription.</p>
+
+      <div class="field-row">
+        <label for="dailyLimit">
+          Daily limit
+          <span class="field-hint">tokens / day</span>
+        </label>
+        <input type="number" id="dailyLimit" min="1000" max="100000000" step="100000" value="1000000" />
+      </div>
+
+      <div class="field-row">
+        <label for="weeklyLimit">
+          Weekly limit
+          <span class="field-hint">tokens / week</span>
+        </label>
+        <input type="number" id="weeklyLimit" min="1000" max="700000000" step="500000" value="7000000" />
+      </div>
+
+      <div class="field-row presets">
+        <span class="field-label">Quick presets</span>
+        <div class="btn-group">
+          <button class="preset-btn" data-daily="1000000" data-weekly="7000000">Pro</button>
+          <button class="preset-btn" data-daily="5000000" data-weekly="35000000">Team</button>
+          <button class="preset-btn" data-daily="10000000" data-weekly="70000000">Enterprise</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" id="saveLimits">Save limits</button>
+        <span class="save-status" id="saveStatus"></span>
+      </div>
+    </section>
+
+    <!-- ── Data ───────────────────────────────────────────────────────────── -->
+    <section class="card">
+      <h2>Data</h2>
+
+      <div class="stat-row">
+        <span>Tracked since</span>
+        <strong id="trackedSince">—</strong>
+      </div>
+      <div class="stat-row">
+        <span>Days with data</span>
+        <strong id="daysWithData">—</strong>
+      </div>
+      <div class="stat-row">
+        <span>All-time total</span>
+        <strong id="allTimeTotal">—</strong>
+      </div>
+
+      <div class="actions gap">
+        <button class="btn-secondary" id="exportBtn">Export JSON</button>
+        <button class="btn-danger" id="resetBtn">Reset all data</button>
+      </div>
+    </section>
+
+    <!-- ── About ──────────────────────────────────────────────────────────── -->
+    <section class="card about">
+      <h2>About</h2>
+      <p>
+        Intercepts streaming responses on <strong>claude.ai</strong> to count tokens locally.
+        No data leaves your browser. Works on Chrome 109+.
+      </p>
+      <p class="hint">
+        v1.0.0 &nbsp;·&nbsp;
+        <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+      </p>
+    </section>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
