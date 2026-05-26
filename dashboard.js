@@ -2,14 +2,11 @@
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtReset(iso, type) {
+function fmtReset(iso) {
   if (!iso) return "";
-  const d = new Date(iso), diff = d - new Date();
-  if (diff <= 0) return "";
-  if (type === "five_hour") {
-    const m = Math.ceil(diff / 60_000), h = Math.floor(m / 60);
-    return "resets " + (h > 0 ? h + "h " + (m % 60) + "m" : m + "m");
-  }
+  const d = new Date(iso);
+  if (d - new Date() <= 0) return "";
+  // Consistent absolute reset time for both limits: "resets Mon 13:00"
   const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   return "resets " + DAYS[d.getDay()] + " " +
     String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
@@ -37,8 +34,8 @@ function keepAlive() {
 function render(usage) {
   const dPct   = usage.five_hour?.utilization ?? 0;
   const wPct   = usage.seven_day?.utilization ?? 0;
-  const dReset = fmtReset(usage.five_hour?.resets_at, "five_hour");
-  const wReset = fmtReset(usage.seven_day?.resets_at, "seven_day");
+  const dReset = fmtReset(usage.five_hour?.resets_at);
+  const wReset = fmtReset(usage.seven_day?.resets_at);
   const dColor = dPct >= 90 ? "#EF4444" : dPct >= 70 ? "#F59E0B" : "#D97706";
 
   document.getElementById("content").innerHTML = `

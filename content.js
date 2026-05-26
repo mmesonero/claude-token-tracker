@@ -76,26 +76,15 @@ window.addEventListener("message", (event) => {
 
   // ── 4. Format helpers ─────────────────────────────────────────────────────
 
-  function fmtReset(isoString, type) {
+  function fmtReset(isoString) {
     if (!isoString) return "";
     const d = new Date(isoString);
-    const now = new Date();
-    const diffMs = d - now;
-    if (diffMs <= 0) return "";
-
-    if (type === "five_hour") {
-      // Show as relative: "4h 26m"
-      const totalMin = Math.ceil(diffMs / 60_000);
-      const h = Math.floor(totalMin / 60);
-      const m = totalMin % 60;
-      return h > 0 ? `${h}h ${m}m` : `${m}m`;
-    } else {
-      // Show as absolute day + time: "Mon 11:00"
-      const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      const hh = d.getHours().toString().padStart(2, "0");
-      const mm = d.getMinutes().toString().padStart(2, "0");
-      return `${DAYS[d.getDay()]} ${hh}:${mm}`;
-    }
+    if (d - new Date() <= 0) return "";
+    // Always show absolute reset time for both limits: "Mon 13:00"
+    const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const hh = d.getHours().toString().padStart(2, "0");
+    const mm = d.getMinutes().toString().padStart(2, "0");
+    return `${DAYS[d.getDay()]} ${hh}:${mm}`;
   }
 
   // ── 5. Widget CSS ─────────────────────────────────────────────────────────
@@ -225,8 +214,8 @@ window.addEventListener("message", (event) => {
 
     const dPct = usage.five_hour?.utilization ?? 0;
     const wPct = usage.seven_day?.utilization ?? 0;
-    const dReset = fmtReset(usage.five_hour?.resets_at, "five_hour");
-    const wReset = fmtReset(usage.seven_day?.resets_at, "seven_day");
+    const dReset = fmtReset(usage.five_hour?.resets_at);
+    const wReset = fmtReset(usage.seven_day?.resets_at);
 
     dFill.style.width = Math.min(100, dPct).toFixed(0) + "%";
     dFill.className   = "ctt-fill orange" + (dPct >= 90 ? " danger" : dPct >= 70 ? " warn" : "");
