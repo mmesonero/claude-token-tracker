@@ -2,13 +2,13 @@
 (function () {
   "use strict";
 
-  // ── 1. Inject fetch interceptor into page context ─────────────────────────
-  const s = document.createElement("script");
-  s.src = chrome.runtime.getURL("page-inject.js");
-  s.onload = () => s.remove();
-  (document.head || document.documentElement).appendChild(s);
+  // ── 1. Inject fetch interceptor ───────────────────────────────────────────
+  const sc = document.createElement("script");
+  sc.src = chrome.runtime.getURL("page-inject.js");
+  sc.onload = () => sc.remove();
+  (document.head || document.documentElement).appendChild(sc);
 
-  // ── 2. Bridge: page → background ──────────────────────────────────────────
+  // ── 2. Bridge: page → background (token counting) ────────────────────────
   window.addEventListener("message", (ev) => {
     if (ev.source !== window || ev.data?.type !== "CLAUDE_TOKEN_USAGE") return;
     const { model, inputTokens, outputTokens } = ev.data;
@@ -17,24 +17,67 @@
       { type: "UPDATE_USAGE", data: { model, inputTokens: inputTokens || 0, outputTokens: outputTokens || 0 } },
       () => void chrome.runtime.lastError
     );
-    setTimeout(updateWidget, 500);
   });
 
-  // ── 3. Helpers ────────────────────────────────────────────────────────────
-  function fmt(n) {
-    if (!n) return "0";
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
-    if (n >= 1_000)     return (n / 1_000).toFixed(1) + "K";
-    return String(n);
-  }
-  function pct(n, lim) { return lim > 0 ? Math.min(100, n / lim * 100) : 0; }
-  function resetIn(type) {
-    const now = new Date();
-    if (type === "daily") { const h = 24 - now.getHours(); return h <= 1 ? "<1h" : `${h}h`; }
-    const d = now.getDay(); return `${d === 0 ? 1 : 8 - d}d`;
+  // ── 3. API: get org ID + real usage ──────────────────────────────────────
+
+  async function getOrgId() {
+    // Method 1: cookie (most reliable on claude.ai)
+    const m = document.cookie.match(/lastActiveOrg=([a-f0-9-]{36})/);
+    if (m) return m[1];
+
+    // Method 2: __NEXT_DATA__
+    try {
+      const id = window.__NEXT_DATA__?.props?.pageProps?.bootstrapData?.organization?.uuid;
+      if (id) return id;
+    } catch (_) {}
+
+    // Method 3: bootstrap API
+    try {
+      const r = await fetch("/api/bootstrap", { credentials: "include" });
+      const d = await r.json();
+      return d?.organization?.uuid || d?.account?.organization_uuid || null;
+    } catch (_) {}
+
+    return null;
   }
 
-  // ── 4. CSS ────────────────────────────────────────────────────────────────
+  async function fetchUsage() {
+    const orgId = await getOrgId();
+    if (!orgId) return null;
+    try {
+      const r = await fetch(`/api/organizations/${orgId}/usage`, { credentials: "include" });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (_) { return null; }
+  }
+
+  // ── 4. Format helpers ─────────────────────────────────────────────────────
+
+  function fmtReset(isoString, type) {
+    if (!isoString) return "";
+    const d = new Date(isoString);
+    const now = new Date();
+    const diffMs = d - now;
+    if (diffMs <= 0) return "";
+
+    if (type === "five_hour") {
+      // Show as relative: "4h 26m"
+      const totalMin = Math.ceil(diffMs / 60_000);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    } else {
+      // Show as absolute day + time: "lun 11:00"
+      const DAYS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+      const hh = d.getHours().toString().padStart(2, "0");
+      const mm = d.getMinutes().toString().padStart(2, "0");
+      return `${DAYS[d.getDay()]} ${hh}:${mm}`;
+    }
+  }
+
+  // ── 5. Widget CSS ─────────────────────────────────────────────────────────
+
   function ensureStyles() {
     if (document.getElementById("ctt-style")) return;
     const st = document.createElement("style");
@@ -45,15 +88,13 @@
         align-items: center;
         justify-content: center;
         gap: 10px;
-        padding: 5px 20px 6px;
-        margin: 0 8px 6px;
-        border-radius: 12px;
-        background: transparent;
+        padding: 5px 16px;
+        margin: 4px 8px 0;
         font-family: inherit;
         font-size: 11px;
-        color: rgba(255,255,255,.45);
-        letter-spacing: .01em;
+        color: rgba(255,255,255,.4);
         -webkit-font-smoothing: antialiased;
+        letter-spacing: .01em;
       }
       .ctt-group {
         display: flex;
@@ -62,11 +103,11 @@
       }
       .ctt-lbl {
         font-size: 10.5px;
-        opacity: .7;
         white-space: nowrap;
+        opacity: .8;
       }
       .ctt-track {
-        width: 80px;
+        width: 76px;
         height: 3px;
         background: rgba(255,255,255,.1);
         border-radius: 100px;
@@ -87,19 +128,20 @@
         font-size: 10.5px;
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
-        min-width: 64px;
       }
       .ctt-sep {
         width: 1px;
         height: 11px;
         background: rgba(255,255,255,.12);
         flex-shrink: 0;
+        margin: 0 1px;
       }
     `;
     document.head.appendChild(st);
   }
 
-  // ── 5. DOM ────────────────────────────────────────────────────────────────
+  // ── 6. DOM build ──────────────────────────────────────────────────────────
+
   const ID = "ctt-bar";
 
   function buildBar() {
@@ -107,37 +149,36 @@
     bar.id = ID;
     bar.innerHTML = `
       <div class="ctt-group">
-        <span class="ctt-lbl">Diario</span>
+        <span class="ctt-lbl">Sesión</span>
         <div class="ctt-track"><div class="ctt-fill orange" id="ctt-d-fill" style="width:0%"></div></div>
-        <span class="ctt-val" id="ctt-d-val">0 · 0%</span>
+        <span class="ctt-val" id="ctt-d-val">—</span>
       </div>
       <div class="ctt-sep"></div>
       <div class="ctt-group">
         <span class="ctt-lbl">Semanal</span>
         <div class="ctt-track"><div class="ctt-fill blue" id="ctt-w-fill" style="width:0%"></div></div>
-        <span class="ctt-val" id="ctt-w-val">0 · 0%</span>
+        <span class="ctt-val" id="ctt-w-val">—</span>
       </div>
     `;
     return bar;
   }
 
-  // Insert ABOVE the rounded input box (fieldset's parent), inside its container
+  // Insert BELOW the rounded input box
   function inject() {
     if (document.getElementById(ID)) return true;
-
-    const fieldset  = document.querySelector('fieldset');
-    if (!fieldset) return false;
-
-    const inputBox  = fieldset.parentElement;   // the rounded white/dark box
-    const container = inputBox?.parentElement;  // parent that holds the box
+    const fieldset  = document.querySelector("fieldset");
+    if (!fieldset)  return false;
+    const inputBox  = fieldset.parentElement;
+    const container = inputBox?.parentElement;
     if (!container || !inputBox) return false;
-
     ensureStyles();
-    container.insertBefore(buildBar(), inputBox);
+    // insertBefore(bar, inputBox.nextSibling) = after the input box
+    container.insertBefore(buildBar(), inputBox.nextSibling);
     return true;
   }
 
-  // ── 6. Data ───────────────────────────────────────────────────────────────
+  // ── 7. Update widget with real API data ───────────────────────────────────
+
   async function updateWidget() {
     const dFill = document.getElementById("ctt-d-fill");
     const wFill = document.getElementById("ctt-w-fill");
@@ -145,26 +186,28 @@
     const wVal  = document.getElementById("ctt-w-val");
     if (!dFill) return;
 
-    const stats = await new Promise(r =>
-      chrome.runtime.sendMessage({ type: "GET_STATS" }, r)
-    );
-    if (!stats) return;
+    const usage = await fetchUsage();
+    if (!usage) {
+      dVal.textContent = "sin datos";
+      wVal.textContent = "sin datos";
+      return;
+    }
 
-    const { today, week, limits } = stats;
-    const dTotal = today.input + today.output;
-    const wTotal = week.input  + week.output;
-    const dPct   = pct(dTotal, limits.daily);
-    const wPct   = pct(wTotal, limits.weekly);
+    const dPct = usage.five_hour?.utilization ?? 0;
+    const wPct = usage.seven_day?.utilization ?? 0;
+    const dReset = fmtReset(usage.five_hour?.resets_at, "five_hour");
+    const wReset = fmtReset(usage.seven_day?.resets_at, "seven_day");
 
-    dFill.style.width = dPct.toFixed(1) + "%";
+    dFill.style.width = Math.min(100, dPct).toFixed(0) + "%";
     dFill.className   = "ctt-fill orange" + (dPct >= 90 ? " danger" : dPct >= 70 ? " warn" : "");
-    dVal.textContent  = `${fmt(dTotal)} · ${dPct.toFixed(0)}% · restablece ${resetIn("daily")}`;
+    dVal.textContent  = `${dPct.toFixed(0)}%` + (dReset ? ` · ${dReset}` : "");
 
-    wFill.style.width = wPct.toFixed(1) + "%";
-    wVal.textContent  = `${fmt(wTotal)} · ${wPct.toFixed(0)}% · restablece ${resetIn("weekly")}`;
+    wFill.style.width = Math.min(100, wPct).toFixed(0) + "%";
+    wVal.textContent  = `${wPct.toFixed(0)}%` + (wReset ? ` · ${wReset}` : "");
   }
 
-  // ── 7. Boot ───────────────────────────────────────────────────────────────
+  // ── 8. Boot ───────────────────────────────────────────────────────────────
+
   function boot() {
     if (inject()) { updateWidget(); return; }
     const obs = new MutationObserver(() => {
@@ -179,7 +222,8 @@
     boot();
   }
 
-  setInterval(updateWidget, 60_000);
+  // Refresh data every 5 min
+  setInterval(updateWidget, 5 * 60_000);
 
   // Re-inject after SPA navigation
   let lastPath = location.pathname;
