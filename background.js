@@ -182,6 +182,39 @@ chrome.windows.onRemoved.addListener((windowId) => {
   if (windowId === dashWindowId) dashWindowId = null;
 });
 
+// ─── Auto-update check ───────────────────────────────────────────────────────
+
+const REMOTE_MANIFEST =
+  "https://raw.githubusercontent.com/mmesonero/claude-token-tracker/master/manifest.json";
+const UPDATE_INTERVAL_MS = 30 * 60_000; // 30 min
+
+async function checkForUpdate() {
+  try {
+    const r = await fetch(`${REMOTE_MANIFEST}?_=${Date.now()}`); // cache-bust
+    if (!r.ok) return;
+    const remote = await r.json();
+    const local  = chrome.runtime.getManifest().version;
+    const hasUpdate = remote.version !== local;
+
+    await chrome.storage.local.set({
+      updateAvailable:  hasUpdate,
+      remoteVersion:    remote.version,
+    });
+
+    if (hasUpdate) {
+      chrome.action.setBadgeText({ text: "↑" });
+      chrome.action.setBadgeBackgroundColor({ color: "#D4670F" });
+    } else {
+      chrome.action.setBadgeText({ text: "" });
+    }
+  } catch {
+    // Network unavailable — silently skip
+  }
+}
+
+checkForUpdate();
+setInterval(checkForUpdate, UPDATE_INTERVAL_MS);
+
 // ─── Message Listener ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -215,6 +248,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       // Fire and forget — result goes to storage, dashboard listens via onChanged
       fetchLiveUsage().catch(() => {});
       sendResponse({ ok: true });
+      return true;
+
+    case "RELOAD":
+      sendResponse({ ok: true });
+      chrome.runtime.reload();
       return true;
   }
 });

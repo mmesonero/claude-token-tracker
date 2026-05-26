@@ -89,6 +89,37 @@ function requestRefresh() {
   chrome.runtime.sendMessage({ type: "REFRESH_USAGE" }, () => void chrome.runtime.lastError);
 }
 
+// ── Update banner ─────────────────────────────────────────────────────────────
+
+async function initUpdateBanner() {
+  const { updateAvailable, remoteVersion } = await chrome.storage.local.get([
+    "updateAvailable", "remoteVersion",
+  ]);
+
+  const banner  = document.getElementById("updateBanner");
+  const verEl   = document.getElementById("updateVersion");
+  const reloadBtn = document.getElementById("reloadBtn");
+
+  function showBanner(version) {
+    verEl.textContent = "v" + version;
+    banner.classList.add("visible");
+  }
+
+  if (updateAvailable && remoteVersion) showBanner(remoteVersion);
+
+  // React if update check fires while dashboard is open
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (changes.updateAvailable?.newValue && changes.remoteVersion?.newValue) {
+      showBanner(changes.remoteVersion.newValue);
+    }
+  });
+
+  reloadBtn.addEventListener("click", () => {
+    chrome.runtime.sendMessage({ type: "RELOAD" }, () => void chrome.runtime.lastError);
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -111,3 +142,4 @@ async function init() {
 }
 
 init();
+initUpdateBanner();
