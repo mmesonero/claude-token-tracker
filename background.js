@@ -85,7 +85,6 @@ async function getStats() {
 
   // 7-day history for sparkline (last 7 days)
   const history = [];
-  const hDate = new Date();
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
@@ -129,20 +128,16 @@ async function getOrgId() {
 
 async function fetchLiveUsage() {
   const orgId = await getOrgId();
-  console.log("[CTT] orgId:", orgId);
   if (!orgId) return null;
   try {
     const r = await fetch(`https://claude.ai/api/organizations/${orgId}/usage`, {
       credentials: "include",
     });
-    console.log("[CTT] usage status:", r.status);
     if (!r.ok) return null;
     const data = await r.json();
-    console.log("[CTT] usage data:", JSON.stringify(data).slice(0, 200));
     await chrome.storage.local.set({ liveUsage: data, liveUsageAt: Date.now() });
     return data;
-  } catch (e) {
-    console.error("[CTT] fetch error:", e);
+  } catch {
     return null;
   }
 }

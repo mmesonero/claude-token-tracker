@@ -1,4 +1,32 @@
 // content.js
+
+// ── 1. Inject page-inject.js into page context (needed to wrap window.fetch) ──
+(function injectFetchWrapper() {
+  const s = document.createElement("script");
+  s.src = chrome.runtime.getURL("page-inject.js");
+  s.onload = () => s.remove();
+  (document.head || document.documentElement).appendChild(s);
+})();
+
+// ── 2. Receive token counts from the injected script and forward to background ──
+window.addEventListener("message", (event) => {
+  if (event.source !== window) return;
+  if (!event.data || event.data.type !== "CLAUDE_TOKEN_USAGE") return;
+  try {
+    chrome.runtime.sendMessage(
+      {
+        type: "UPDATE_USAGE",
+        data: {
+          model:        event.data.model,
+          inputTokens:  event.data.inputTokens,
+          outputTokens: event.data.outputTokens,
+        },
+      },
+      () => void chrome.runtime.lastError
+    );
+  } catch { /* extension context gone */ }
+}, false);
+
 (function () {
   "use strict";
 
@@ -62,8 +90,8 @@
       const m = totalMin % 60;
       return h > 0 ? `${h}h ${m}m` : `${m}m`;
     } else {
-      // Show as absolute day + time: "lun 11:00"
-      const DAYS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+      // Show as absolute day + time: "Mon 11:00"
+      const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const hh = d.getHours().toString().padStart(2, "0");
       const mm = d.getMinutes().toString().padStart(2, "0");
       return `${DAYS[d.getDay()]} ${hh}:${mm}`;
@@ -143,13 +171,13 @@
     bar.id = ID;
     bar.innerHTML = `
       <div class="ctt-group">
-        <span class="ctt-lbl">Sesión</span>
+        <span class="ctt-lbl">5h limit</span>
         <div class="ctt-track"><div class="ctt-fill orange" id="ctt-d-fill" style="width:0%"></div></div>
         <span class="ctt-val" id="ctt-d-val">—</span>
       </div>
       <div class="ctt-sep"></div>
       <div class="ctt-group">
-        <span class="ctt-lbl">Semanal</span>
+        <span class="ctt-lbl">Weekly</span>
         <div class="ctt-track"><div class="ctt-fill blue" id="ctt-w-fill" style="width:0%"></div></div>
         <span class="ctt-val" id="ctt-w-val">—</span>
       </div>
@@ -184,8 +212,8 @@
 
     const usage = await fetchUsage();
     if (!usage) {
-      dVal.textContent = "sin datos";
-      wVal.textContent = "sin datos";
+      dVal.textContent = "no data";
+      wVal.textContent = "no data";
       return;
     }
 
