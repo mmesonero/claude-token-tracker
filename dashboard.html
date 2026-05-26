@@ -205,30 +205,37 @@ function showError(msg) {
     `<div class="state">${msg}</div>`;
 }
 
-async function load() {
-  // Timeout: si el background no responde en 8s, muestra error
-  const timeout = new Promise((_, rej) => setTimeout(() => rej("timeout"), 8000));
-  const msg     = new Promise((res, rej) => {
-    chrome.runtime.sendMessage({ type: "GET_USAGE" }, (r) => {
-      if (chrome.runtime.lastError) rej(chrome.runtime.lastError.message);
-      else res(r);
-    });
-  });
-
+async function fetchDirect() {
+  // Try fetching directly from the extension page using chrome.cookies
+  const cookie = await new Promise(r =>
+    chrome.cookies.get({ url: "https://claude.ai", name: "lastActiveOrg" }, r)
+  );
+  if (!cookie?.value) return { error: "No cookie lastActiveOrg — ¿estás logueado en claude.ai?" };
+  const orgId = cookie.value;
   try {
-    const res = await Promise.race([msg, timeout]);
-    if (!res?.liveUsage) {
-      showError("Sin datos.<small>Asegúrate de estar logueado en claude.ai en Chrome.</small>");
-      return;
-    }
-    render(res.liveUsage);
-    if (res.liveUsageAt) {
-      const d = new Date(res.liveUsageAt);
-      document.getElementById("updated").textContent =
-        "Actualizado " + d.toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" });
-    }
-  } catch (e) {
-    showError(`Error: ${e}<small>Recarga la extensión en chrome://extensions</small>`);
+    const resp = await fetch(`https://claude.ai/api/organizations/${orgId}/usage`, {
+      credentials: "include"
+    });
+    if (!resp.ok) return { error: `API status ${resp.status} — orgId: ${orgId}` };
+    const data = await resp.json();
+    return { data };
+  } catch(e) {
+    return { error: `Fetch falló: ${e.message}` };
+  }
+}
+
+async function load() {
+  try {
+    const result = await Promise.race([
+      fetchDirect(),
+      new Promise((_, rej) => setTimeout(() => rej("timeout 8s"), 8000))
+    ]);
+    if (result.error) { showError(result.error); return; }
+    render(result.data);
+    document.getElementById("updated").textContent =
+      "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" });
+  } catch(e) {
+    showError(`Error: ${e}`);
   }
 }
 
