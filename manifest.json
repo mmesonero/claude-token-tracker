@@ -8,8 +8,7 @@
     "activeTab"
   ],
   "host_permissions": [
-    "https://claude.ai/*",
-    "http://localhost:27182/"
+    "https://claude.ai/*"
   ],
   "action": {
     "default_popup": "popup.html",
