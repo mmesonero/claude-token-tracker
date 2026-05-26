@@ -32,7 +32,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["page-inject.js"],
+      "resources": ["icons/*.png"],
       "matches": ["https://claude.ai/*"]
     }
   ],

@@ -2,12 +2,6 @@
 (function () {
   "use strict";
 
-  // ── 1. Inject fetch interceptor ───────────────────────────────────────────
-  const sc = document.createElement("script");
-  sc.src = chrome.runtime.getURL("page-inject.js");
-  sc.onload = () => sc.remove();
-  (document.head || document.documentElement).appendChild(sc);
-
   // ── Context guard — returns false when extension is reloaded/invalidated ──
   function alive() {
     try { return !!chrome.runtime?.id; } catch { return false; }
@@ -19,21 +13,7 @@
     document.getElementById("ctt-style")?.remove();
   }
 
-  // ── 2. Bridge: page → background (token counting) ────────────────────────
-  window.addEventListener("message", (ev) => {
-    if (ev.source !== window || ev.data?.type !== "CLAUDE_TOKEN_USAGE") return;
-    if (!alive()) return;
-    const { model, inputTokens, outputTokens } = ev.data;
-    if (!inputTokens && !outputTokens) return;
-    try {
-      chrome.runtime.sendMessage(
-        { type: "UPDATE_USAGE", data: { model, inputTokens: inputTokens || 0, outputTokens: outputTokens || 0 } },
-        () => void chrome.runtime.lastError
-      );
-    } catch { /* context gone */ }
-  });
-
-  // ── 3. API: get org ID + real usage ──────────────────────────────────────
+  // ── API: get org ID + real usage ─────────────────────────────────────────
 
   async function getOrgId() {
     // Method 1: cookie (most reliable on claude.ai)
