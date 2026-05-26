@@ -88,7 +88,7 @@ function drawIcon(set, w, h) {
   const gap   = Math.max(1, Math.round(w * 0.07));
   const baseY = Math.round(h * 0.76);
   const maxH  = Math.round(h * 0.46);
-  const heights = [Math.round(maxH * 0.52), Math.round(maxH * 1.0), Math.round(maxH * 0.74)];
+  const heights = [Math.round(maxH * 0.45), Math.round(maxH * 0.72), Math.round(maxH * 1.0)];
 
   const totalW = heights.length * barW + (heights.length - 1) * gap;
   let bx = Math.round((w - totalW) / 2);
