@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8"/>
-<title>Claude · Usage</title>
+<title>Claude Token Tracker</title>
 <link rel="icon" type="image/png" href="icons/icon48.png"/>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -123,6 +123,56 @@
     color: rgba(255,253,247,.18);
   }
 
+  /* ── Live badge ── */
+  .live-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: rgba(255,253,247,.3);
+    border: 1px solid rgba(255,253,247,.1);
+    border-radius: 100px;
+    padding: 3px 8px 3px 6px;
+    transition: color .3s, border-color .3s;
+  }
+  .live-badge.active {
+    color: #4ADE80;
+    border-color: rgba(74,222,128,.35);
+  }
+  .live-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .5;
+  }
+  .live-badge.active .live-dot {
+    opacity: 1;
+    animation: pulse-dot 1.2s ease-in-out;
+  }
+  @keyframes pulse-dot {
+    0%   { transform: scale(1);   opacity: 1; }
+    50%  { transform: scale(1.6); opacity: .7; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+
+  .countdown {
+    font-size: 11px;
+    color: rgba(255,253,247,.2);
+  }
+  .countdown span {
+    font-variant-numeric: tabular-nums;
+    color: rgba(255,253,247,.35);
+  }
+
   /* ── Footer links ── */
   .footer {
     margin-top: 28px;
@@ -159,6 +209,14 @@
 
 <div id="content">
   <div class="state">Cargando…</div>
+</div>
+
+<div class="live-row">
+  <span class="live-badge" id="liveBadge">
+    <span class="live-dot"></span>
+    LIVE
+  </span>
+  <span class="countdown">Next refresh in <span id="countdown">60</span>s</span>
 </div>
 
 <div class="updated" id="updated"></div>
