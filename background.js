@@ -182,10 +182,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         .then(() => sendResponse({ ok: true }));
       return true;
 
-    case "GET_USAGE":
-      fetchLiveUsage().then((liveUsage) => {
-        sendResponse({ liveUsage, liveUsageAt: Date.now() });
-      }).catch(() => sendResponse({ liveUsage: null }));
+    case "REFRESH_USAGE":
+      // Fire and forget — result goes to storage, dashboard listens via onChanged
+      fetchLiveUsage().catch(() => {});
+      sendResponse({ ok: true });
       return true;
   }
 });

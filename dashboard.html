@@ -163,11 +163,10 @@ function fmtReset(iso, type) {
 }
 
 function render(usage) {
-  const dPct   = (usage.five_hour?.utilization  ?? 0);
-  const wPct   = (usage.seven_day?.utilization  ?? 0);
+  const dPct   = usage.five_hour?.utilization  ?? 0;
+  const wPct   = usage.seven_day?.utilization  ?? 0;
   const dReset = fmtReset(usage.five_hour?.resets_at, "five_hour");
   const wReset = fmtReset(usage.seven_day?.resets_at, "seven_day");
-
   const dColor = dPct >= 90 ? "#EF4444" : dPct >= 70 ? "#F59E0B" : "#D97706";
 
   document.getElementById("content").innerHTML = `
@@ -184,7 +183,6 @@ function render(usage) {
           <span class="pct" style="color:${dColor}">${dPct.toFixed(0)}%</span>
         </div>
       </div>
-
       <div class="card">
         <div class="card-top">
           <span class="card-label">Semanal</span>
@@ -198,49 +196,49 @@ function render(usage) {
         </div>
       </div>
     </div>`;
+
+  document.getElementById("updated").textContent =
+    "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" });
 }
 
-function showError(msg) {
+function showWaiting() {
   document.getElementById("content").innerHTML =
-    `<div class="state">${msg}</div>`;
+    `<div class="state">Obteniendo datos…<small>El background está fetching la API de Claude.</small></div>`;
 }
 
-async function fetchDirect() {
-  // Try fetching directly from the extension page using chrome.cookies
-  const cookie = await new Promise(r =>
-    chrome.cookies.get({ url: "https://claude.ai", name: "lastActiveOrg" }, r)
-  );
-  if (!cookie?.value) return { error: "No cookie lastActiveOrg — ¿estás logueado en claude.ai?" };
-  const orgId = cookie.value;
-  try {
-    const resp = await fetch(`https://claude.ai/api/organizations/${orgId}/usage`, {
-      credentials: "include"
-    });
-    if (!resp.ok) return { error: `API status ${resp.status} — orgId: ${orgId}` };
-    const data = await resp.json();
-    return { data };
-  } catch(e) {
-    return { error: `Fetch falló: ${e.message}` };
+// ── Lee storage directamente, sin pasar por mensajes ─────────────────────────
+async function loadFromStorage() {
+  const { liveUsage } = await chrome.storage.local.get("liveUsage");
+  if (liveUsage) {
+    render(liveUsage);
+    return true;
   }
+  return false;
 }
 
-async function load() {
-  try {
-    const result = await Promise.race([
-      fetchDirect(),
-      new Promise((_, rej) => setTimeout(() => rej("timeout 8s"), 8000))
-    ]);
-    if (result.error) { showError(result.error); return; }
-    render(result.data);
-    document.getElementById("updated").textContent =
-      "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" });
-  } catch(e) {
-    showError(`Error: ${e}`);
-  }
+async function init() {
+  // 1. Mostrar lo que haya en cache inmediatamente
+  const hasCached = await loadFromStorage();
+
+  // 2. Pedir al background que fetchee datos frescos (fire & forget)
+  chrome.runtime.sendMessage({ type: "REFRESH_USAGE" }, () => void chrome.runtime.lastError);
+
+  // 3. Si no hay cache, mostrar "obteniendo..."
+  if (!hasCached) showWaiting();
+
+  // 4. Escuchar cambios en storage — cuando background guarde, actualizamos
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.liveUsage?.newValue) {
+      render(changes.liveUsage.newValue);
+    }
+  });
 }
 
-load();
-setInterval(load, 60_000);
+init();
+// Refrescar cada 5 min
+setInterval(() => {
+  chrome.runtime.sendMessage({ type: "REFRESH_USAGE" }, () => void chrome.runtime.lastError);
+}, 5 * 60_000);
 </script>
 </body>
 </html>
