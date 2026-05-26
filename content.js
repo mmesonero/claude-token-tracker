@@ -162,12 +162,6 @@
     const bar = document.createElement("div");
     bar.id = ID;
     bar.innerHTML = `
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="flex-shrink:0;opacity:.55">
-        <circle cx="5.5" cy="5.5" r="5.5" fill="#D4670F"/>
-        <rect x="1"   y="7"   width="1.8" height="2.5" rx=".5" fill="white" opacity=".9"/>
-        <rect x="4.1" y="5.3" width="1.8" height="4.2" rx=".5" fill="white" opacity=".9"/>
-        <rect x="7.2" y="3"   width="1.8" height="6.5" rx=".5" fill="white" opacity=".9"/>
-      </svg>
       <div class="ctt-group">
         <span class="ctt-lbl">Sesión</span>
         <div class="ctt-track"><div class="ctt-fill orange" id="ctt-d-fill" style="width:0%"></div></div>
