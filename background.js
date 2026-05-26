@@ -35,7 +35,7 @@ async function readStorage() {
 }
 
 async function updateUsage({ model, inputTokens, outputTokens }) {
-  const { usage = {}, limits = DEFAULT_LIMITS } = await readStorage();
+  const { usage = {} } = await readStorage();
 
   const today = dateKey();
   if (!usage[today]) usage[today] = { input: 0, output: 0, models: {} };
