@@ -17,11 +17,10 @@
       { type: "UPDATE_USAGE", data: { model, inputTokens: inputTokens || 0, outputTokens: outputTokens || 0 } },
       () => void chrome.runtime.lastError
     );
-    setTimeout(updateWidget, 300);
+    setTimeout(updateWidget, 400);
   });
 
-  // ── 3. Widget ─────────────────────────────────────────────────────────────
-
+  // ── 3. Helpers ────────────────────────────────────────────────────────────
   function fmt(n) {
     if (!n) return "0";
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
@@ -36,125 +35,117 @@
       return h <= 1 ? "< 1h" : `${h}h`;
     }
     const day = now.getDay();
-    const d = day === 0 ? 1 : 8 - day;
-    return `${d}d`;
+    return `${day === 0 ? 1 : 8 - day}d`;
   }
 
-  // Inject styles once
-  const STYLE_ID = "ctt-style";
+  // ── 4. Widget — barra fija debajo del input de chat ───────────────────────
+  const WIDGET_ID = "ctt-bar";
+
+  function buildWidget() {
+    const bar = document.createElement("div");
+    bar.id = WIDGET_ID;
+    bar.innerHTML = `
+      <div class="ctt-section">
+        <span class="ctt-label">Diario</span>
+        <div class="ctt-track"><div class="ctt-fill orange" id="ctt-d-fill" style="width:0%"></div></div>
+        <span class="ctt-stat" id="ctt-d-stat">—</span>
+      </div>
+      <div class="ctt-divider"></div>
+      <div class="ctt-section">
+        <span class="ctt-label">Semanal</span>
+        <div class="ctt-track"><div class="ctt-fill blue" id="ctt-w-fill" style="width:0%"></div></div>
+        <span class="ctt-stat" id="ctt-w-stat">—</span>
+      </div>
+    `;
+    return bar;
+  }
+
   function ensureStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-      #ctt-widget {
-        padding: 6px 10px 8px;
-        font-family: inherit;
-        font-size: 12px;
-        line-height: 1.4;
+    if (document.getElementById("ctt-style")) return;
+    const st = document.createElement("style");
+    st.id = "ctt-style";
+    st.textContent = `
+      #ctt-bar {
+        position: fixed;
+        bottom: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 13px;
+        background: rgba(31, 31, 30, 0.92);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 100px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        font-size: 11px;
         color: #fff;
-        -webkit-font-smoothing: antialiased;
-        border-top: 1px solid rgba(255,255,255,.08);
-        overflow: hidden;
-      }
-      #ctt-widget .ctt-head {
-        display: flex;
-        justify-content: space-between;
-        font-size: 10.5px;
-        opacity: .45;
-        margin-bottom: 7px;
-        letter-spacing: .01em;
-      }
-      #ctt-widget .ctt-row { margin-bottom: 6px; }
-      #ctt-widget .ctt-meta {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 2px;
         white-space: nowrap;
-        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,.4);
+        pointer-events: none;
+        -webkit-font-smoothing: antialiased;
+        transition: opacity .3s ease;
       }
-      #ctt-widget .ctt-name {
-        font-size: 11.5px;
-        font-weight: 500;
-        opacity: .9;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 58%;
+      #ctt-bar:hover { opacity: .6; }
+      .ctt-section {
+        display: flex;
+        align-items: center;
+        gap: 6px;
       }
-      #ctt-widget .ctt-info {
-        font-size: 10.5px;
+      .ctt-label {
+        font-size: 10px;
         opacity: .5;
-        flex-shrink: 0;
-        margin-left: 4px;
+        letter-spacing: .02em;
       }
-      #ctt-widget .ctt-track {
+      .ctt-track {
+        width: 72px;
         height: 3px;
-        background: rgba(255,255,255,.12);
+        background: rgba(255,255,255,.15);
         border-radius: 100px;
         overflow: hidden;
       }
-      #ctt-widget .ctt-fill {
+      .ctt-fill {
         height: 100%;
         border-radius: 100px;
-        transition: width .4s ease;
+        transition: width .5s ease;
         min-width: 2px;
       }
-      #ctt-widget .ctt-fill.orange { background: #D97706; }
-      #ctt-widget .ctt-fill.orange.warn   { background: #B45309; }
-      #ctt-widget .ctt-fill.orange.danger { background: #DC2626; }
-      #ctt-widget .ctt-fill.blue { background: #3B82F6; }
+      .ctt-fill.orange       { background: #D97706; }
+      .ctt-fill.orange.warn  { background: #F59E0B; }
+      .ctt-fill.orange.danger{ background: #EF4444; }
+      .ctt-fill.blue         { background: #3B82F6; }
+      .ctt-stat {
+        font-size: 10.5px;
+        opacity: .7;
+        font-variant-numeric: tabular-nums;
+        min-width: 52px;
+      }
+      .ctt-divider {
+        width: 1px;
+        height: 12px;
+        background: rgba(255,255,255,.15);
+        flex-shrink: 0;
+      }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(st);
   }
 
-  // Build widget DOM
-  function buildWidget() {
-    const w = document.createElement("div");
-    w.id = "ctt-widget";
-    w.innerHTML = `
-      <div class="ctt-head"><span>Token Tracker</span><span>→</span></div>
-      <div class="ctt-row">
-        <div class="ctt-meta">
-          <span class="ctt-name">Diario · todos los modelos</span>
-          <span class="ctt-info" id="ctt-d-info">—</span>
-        </div>
-        <div class="ctt-track"><div class="ctt-fill orange" id="ctt-d-bar" style="width:0%"></div></div>
-      </div>
-      <div class="ctt-row">
-        <div class="ctt-meta">
-          <span class="ctt-name">Semanal · todos los modelos</span>
-          <span class="ctt-info" id="ctt-w-info">—</span>
-        </div>
-        <div class="ctt-track"><div class="ctt-fill blue" id="ctt-w-bar" style="width:0%"></div></div>
-      </div>
-    `;
-    return w;
-  }
-
-  // Find the correct insertion point using the stable data-testid anchor
   function inject() {
-    if (document.getElementById("ctt-widget")) return true;
-
-    const userBtn = document.querySelector('[data-testid="user-menu-button"]');
-    if (!userBtn) return false;
-
-    // Walk up 2 levels: button → wrapper div → row div (the one to insert before)
-    const userRow = userBtn.parentElement?.parentElement;
-    const container = userRow?.parentElement;
-    if (!container || !userRow) return false;
-
+    if (document.getElementById(WIDGET_ID)) return;
     ensureStyles();
-    container.insertBefore(buildWidget(), userRow);
-    return true;
+    document.body.appendChild(buildWidget());
   }
 
-  // Fill widget with real stats
+  // ── 5. Data update ────────────────────────────────────────────────────────
   async function updateWidget() {
-    const dBar  = document.getElementById("ctt-d-bar");
-    const wBar  = document.getElementById("ctt-w-bar");
-    const dInfo = document.getElementById("ctt-d-info");
-    const wInfo = document.getElementById("ctt-w-info");
-    if (!dBar) return;
+    const dFill = document.getElementById("ctt-d-fill");
+    const wFill = document.getElementById("ctt-w-fill");
+    const dStat = document.getElementById("ctt-d-stat");
+    const wStat = document.getElementById("ctt-w-stat");
+    if (!dFill) return;
 
     const stats = await new Promise(r =>
       chrome.runtime.sendMessage({ type: "GET_STATS" }, r)
@@ -164,32 +155,21 @@
     const { today, week, limits } = stats;
     const dTotal = today.input + today.output;
     const wTotal = week.input + week.output;
-    const dPct = limits.daily  > 0 ? Math.min(100, (dTotal / limits.daily)  * 100) : 0;
-    const wPct = limits.weekly > 0 ? Math.min(100, (wTotal / limits.weekly) * 100) : 0;
+    const dPct = limits.daily  > 0 ? Math.min(100, dTotal / limits.daily  * 100) : 0;
+    const wPct = limits.weekly > 0 ? Math.min(100, wTotal / limits.weekly * 100) : 0;
 
-    dBar.style.width = dPct.toFixed(1) + "%";
-    dBar.className = "ctt-fill orange" + (dPct >= 90 ? " danger" : dPct >= 70 ? " warn" : "");
-    dInfo.textContent = `${fmt(dTotal)} · restablece ${resetIn("daily")}`;
+    dFill.style.width = dPct.toFixed(1) + "%";
+    dFill.className = "ctt-fill orange" + (dPct >= 90 ? " danger" : dPct >= 70 ? " warn" : "");
+    dStat.textContent = `${fmt(dTotal)} · ${dPct.toFixed(0)}%`;
 
-    wBar.style.width = wPct.toFixed(1) + "%";
-    wInfo.textContent = `${fmt(wTotal)} · restablece ${resetIn("weekly")}`;
+    wFill.style.width = wPct.toFixed(1) + "%";
+    wStat.textContent = `${fmt(wTotal)} · ${wPct.toFixed(0)}%`;
   }
 
-  // ── 4. Boot: wait for sidebar, inject, refresh ────────────────────────────
+  // ── 6. Boot ───────────────────────────────────────────────────────────────
   function boot() {
-    const ok = inject();
-    if (ok) {
-      updateWidget();
-      return;
-    }
-    // Sidebar not ready — watch DOM
-    const obs = new MutationObserver(() => {
-      if (inject()) {
-        obs.disconnect();
-        updateWidget();
-      }
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
+    inject();
+    updateWidget();
   }
 
   if (document.readyState === "loading") {
@@ -198,7 +178,6 @@
     boot();
   }
 
-  // Refresh every 60s
   setInterval(updateWidget, 60_000);
 
   // Re-inject after SPA navigation
@@ -206,7 +185,9 @@
   setInterval(() => {
     if (location.pathname !== lastPath) {
       lastPath = location.pathname;
-      setTimeout(boot, 800);
+      const old = document.getElementById(WIDGET_ID);
+      if (old) old.remove();
+      setTimeout(boot, 600);
     }
   }, 1_000);
 
