@@ -186,7 +186,7 @@ chrome.windows.onRemoved.addListener((windowId) => {
 
 const REMOTE_MANIFEST =
   "https://raw.githubusercontent.com/mmesonero/claude-token-tracker/master/manifest.json";
-const UPDATE_INTERVAL_MS = 30 * 60_000; // 30 min
+const UPDATE_INTERVAL_MS = 60_000; // 1 min
 
 async function checkForUpdate() {
   try {
