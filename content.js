@@ -27,85 +27,44 @@
     if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
     return String(n);
   }
-
   function resetIn(type) {
     const now = new Date();
-    if (type === "daily") {
-      const h = 24 - now.getHours();
-      return h <= 1 ? "< 1h" : `${h}h`;
-    }
+    if (type === "daily") { const h = 24 - now.getHours(); return h <= 1 ? "<1h" : `${h}h`; }
     const day = now.getDay();
     return `${day === 0 ? 1 : 8 - day}d`;
   }
 
-  // ── 4. Widget — barra fija debajo del input de chat ───────────────────────
-  const WIDGET_ID = "ctt-bar";
-
-  function buildWidget() {
-    const bar = document.createElement("div");
-    bar.id = WIDGET_ID;
-    bar.innerHTML = `
-      <div class="ctt-section">
-        <span class="ctt-label">Diario</span>
-        <div class="ctt-track"><div class="ctt-fill orange" id="ctt-d-fill" style="width:0%"></div></div>
-        <span class="ctt-stat" id="ctt-d-stat">—</span>
-      </div>
-      <div class="ctt-divider"></div>
-      <div class="ctt-section">
-        <span class="ctt-label">Semanal</span>
-        <div class="ctt-track"><div class="ctt-fill blue" id="ctt-w-fill" style="width:0%"></div></div>
-        <span class="ctt-stat" id="ctt-w-stat">—</span>
-      </div>
-    `;
-    return bar;
-  }
+  // ── 4. Widget ─────────────────────────────────────────────────────────────
+  const ID = "ctt-row";
 
   function ensureStyles() {
     if (document.getElementById("ctt-style")) return;
     const st = document.createElement("style");
     st.id = "ctt-style";
     st.textContent = `
-      #ctt-bar {
-        position: fixed;
-        bottom: 14px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 2147483647;
+      #ctt-row {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 5px 13px;
-        background: rgba(31, 31, 30, 0.92);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,.1);
-        border-radius: 100px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-        font-size: 11px;
-        color: #fff;
+        gap: 8px;
+        padding: 4px 12px 6px;
+        opacity: .65;
+        transition: opacity .2s;
+      }
+      #ctt-row:hover { opacity: 1; }
+      .ctt-lbl {
+        font-size: 10.5px;
+        color: var(--text-200, rgba(255,255,255,.5));
         white-space: nowrap;
-        box-shadow: 0 2px 12px rgba(0,0,0,.4);
-        pointer-events: none;
-        -webkit-font-smoothing: antialiased;
-        transition: opacity .3s ease;
-      }
-      #ctt-bar:hover { opacity: .6; }
-      .ctt-section {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .ctt-label {
-        font-size: 10px;
-        opacity: .5;
-        letter-spacing: .02em;
+        min-width: 38px;
+        font-family: inherit;
       }
       .ctt-track {
-        width: 72px;
+        flex: 1;
         height: 3px;
-        background: rgba(255,255,255,.15);
+        background: var(--bg-300, rgba(255,255,255,.12));
         border-radius: 100px;
         overflow: hidden;
+        max-width: 90px;
       }
       .ctt-fill {
         height: 100%;
@@ -113,33 +72,56 @@
         transition: width .5s ease;
         min-width: 2px;
       }
-      .ctt-fill.orange       { background: #D97706; }
-      .ctt-fill.orange.warn  { background: #F59E0B; }
-      .ctt-fill.orange.danger{ background: #EF4444; }
-      .ctt-fill.blue         { background: #3B82F6; }
+      .ctt-fill.orange        { background: #D97706; }
+      .ctt-fill.orange.warn   { background: #F59E0B; }
+      .ctt-fill.orange.danger { background: #EF4444; }
+      .ctt-fill.blue          { background: #3B82F6; }
       .ctt-stat {
         font-size: 10.5px;
-        opacity: .7;
+        color: var(--text-200, rgba(255,255,255,.5));
         font-variant-numeric: tabular-nums;
-        min-width: 52px;
+        white-space: nowrap;
+        min-width: 68px;
+        font-family: inherit;
       }
-      .ctt-divider {
+      .ctt-sep {
         width: 1px;
-        height: 12px;
+        height: 10px;
         background: rgba(255,255,255,.15);
         flex-shrink: 0;
+        margin: 0 2px;
       }
     `;
     document.head.appendChild(st);
   }
 
-  function inject() {
-    if (document.getElementById(WIDGET_ID)) return;
-    ensureStyles();
-    document.body.appendChild(buildWidget());
+  function buildRow() {
+    const row = document.createElement("div");
+    row.id = ID;
+    row.innerHTML = `
+      <span class="ctt-lbl">Diario</span>
+      <div class="ctt-track"><div class="ctt-fill orange" id="ctt-d-fill" style="width:0%"></div></div>
+      <span class="ctt-stat" id="ctt-d-stat">0 · 0%</span>
+      <div class="ctt-sep"></div>
+      <span class="ctt-lbl">Semanal</span>
+      <div class="ctt-track"><div class="ctt-fill blue" id="ctt-w-fill" style="width:0%"></div></div>
+      <span class="ctt-stat" id="ctt-w-stat">0 · 0%</span>
+    `;
+    return row;
   }
 
-  // ── 5. Data update ────────────────────────────────────────────────────────
+  // Inject as last child of the chat fieldset (below the toolbar row)
+  function inject() {
+    if (document.getElementById(ID)) return true;
+    const fieldset = document.querySelector('fieldset.flex.w-full')
+                  || document.querySelector('fieldset');
+    if (!fieldset) return false;
+    ensureStyles();
+    fieldset.appendChild(buildRow());
+    return true;
+  }
+
+  // ── 5. Update data ────────────────────────────────────────────────────────
   async function updateWidget() {
     const dFill = document.getElementById("ctt-d-fill");
     const wFill = document.getElementById("ctt-w-fill");
@@ -168,8 +150,11 @@
 
   // ── 6. Boot ───────────────────────────────────────────────────────────────
   function boot() {
-    inject();
-    updateWidget();
+    if (inject()) { updateWidget(); return; }
+    const obs = new MutationObserver(() => {
+      if (inject()) { obs.disconnect(); updateWidget(); }
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
   }
 
   if (document.readyState === "loading") {
@@ -180,14 +165,14 @@
 
   setInterval(updateWidget, 60_000);
 
-  // Re-inject after SPA navigation
+  // Re-inject on SPA navigation
   let lastPath = location.pathname;
   setInterval(() => {
     if (location.pathname !== lastPath) {
       lastPath = location.pathname;
-      const old = document.getElementById(WIDGET_ID);
+      const old = document.getElementById(ID);
       if (old) old.remove();
-      setTimeout(boot, 600);
+      setTimeout(boot, 800);
     }
   }, 1_000);
 
