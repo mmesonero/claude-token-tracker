@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>Widget Preview — claude.ai sidebar simulation</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: #0F0E0D;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Fake claude.ai sidebar ── */
+    .sidebar {
+      width: 260px;
+      background: #1A1918;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      flex-shrink: 0;
+      border-right: 1px solid rgba(255,255,255,.06);
+      color: #FFFDF7;
+    }
+
+    .sidebar-top {
+      padding: 14px 12px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      font-size: 13px;
+      opacity: .5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sidebar-top svg { opacity: .6; }
+
+    .conversations {
+      flex: 1;
+      overflow: hidden;
+      padding: 8px 0;
+    }
+    .conv-item {
+      padding: 7px 14px;
+      font-size: 12.5px;
+      opacity: .45;
+      cursor: pointer;
+      border-radius: 6px;
+      margin: 0 6px 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .conv-item:hover { background: rgba(255,255,255,.05); opacity: .7; }
+    .conv-item.active { background: rgba(255,255,255,.08); opacity: .9; }
+
+    .sidebar-bottom {
+      padding: 0;
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+
+    .plan-native {
+      padding: 8px 12px 10px;
+      font-size: 12px;
+      color: #FFFDF7;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .plan-native .ph {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 11px;
+      opacity: .5;
+      cursor: pointer;
+    }
+    .plan-native .ph:hover { opacity: .8; }
+    .plan-native .prow { margin-bottom: 7px; }
+    .plan-native .plabels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+      font-size: 11.5px;
+    }
+    .plan-native .plabels .pl { font-weight: 500; opacity: .9; }
+    .plan-native .plabels .ps { font-size: 10.5px; opacity: .5; }
+    .plan-native .ptrack {
+      height: 3px;
+      background: rgba(255,255,255,.1);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    .plan-native .pfill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width .5s ease;
+    }
+    .pfill.orange { background: #D97706; }
+    .pfill.blue   { background: #3D7AE4; }
+
+    /* ── Our injected widget (same look) ── */
+    #ctt-widget {
+      padding: 8px 12px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #FFFDF7;
+      border-top: 1px solid rgba(255,255,255,.06);
+    }
+    #ctt-widget .ctt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      cursor: pointer;
+      opacity: .55;
+      font-size: 11px;
+    }
+    #ctt-widget .ctt-header:hover { opacity: .8; }
+    #ctt-widget .ctt-row { margin-bottom: 7px; }
+    #ctt-widget .ctt-row-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 3px;
+    }
+    #ctt-widget .ctt-label {
+      font-size: 11.5px;
+      font-weight: 500;
+      opacity: .9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 60%;
+    }
+    #ctt-widget .ctt-stat {
+      font-size: 10.5px;
+      opacity: .5;
+      white-space: nowrap;
+      margin-left: 6px;
+      flex-shrink: 0;
+    }
+    #ctt-widget .ctt-track {
+      width: 100%;
+      height: 3px;
+      background: rgba(255,255,255,.1);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    #ctt-widget .ctt-fill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width .5s ease;
+    }
+    #ctt-widget .ctt-fill.orange { background: #D97706; }
+    #ctt-widget .ctt-fill.blue   { background: #3D7AE4; }
+
+    .user-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 14px;
+      font-size: 12.5px;
+      opacity: .6;
+      cursor: pointer;
+    }
+    .user-row:hover { opacity: .9; }
+    .avatar {
+      width: 24px; height: 24px;
+      background: #D4670F;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: white;
+      flex-shrink: 0;
+    }
+
+    /* ── Main content area ── */
+    .main {
+      flex: 1;
+      background: #FAF9F7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9B9692;
+      font-size: 13px;
+    }
+
+    /* ── Comparison label ── */
+    .note {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      background: rgba(0,0,0,.6);
+      color: rgba(255,255,255,.7);
+      font-size: 10px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .label-native {
+      font-size: 9px; text-transform: uppercase; letter-spacing: .06em;
+      color: #D97706; padding: 2px 12px; opacity: .6;
+    }
+    .label-ours {
+      font-size: 9px; text-transform: uppercase; letter-spacing: .06em;
+      color: #3D7AE4; padding: 2px 12px; opacity: .6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <!-- Top bar -->
+    <div class="sidebar-top">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Nueva conversación
+    </div>
+
+    <!-- Conversations -->
+    <div class="conversations">
+      <div class="conv-item active">Claude Token Tracker</div>
+      <div class="conv-item">Diseño de extensión Chrome</div>
+      <div class="conv-item">Refactoring del dashboard</div>
+      <div class="conv-item">API integration OAuth2</div>
+      <div class="conv-item">Fix bug en el parser SSE</div>
+      <div class="conv-item">Deploy en Vercel</div>
+    </div>
+
+    <div class="sidebar-bottom">
+
+      <!-- Native claude.ai usage widget (reference) -->
+      <span class="label-native">Nativo claude.ai (referencia)</span>
+      <div class="plan-native">
+        <div class="ph">
+          <span>Uso del plan</span>
+          <span>→</span>
+        </div>
+        <div class="prow">
+          <div class="plabels">
+            <span class="pl">Límite de 5 horas</span>
+            <span class="ps">84% · restablece 2h</span>
+          </div>
+          <div class="ptrack"><div class="pfill orange" style="width:84%"></div></div>
+        </div>
+        <div class="prow">
+          <div class="plabels">
+            <span class="pl">Semanal · todos los modelos</span>
+            <span class="ps">8% · restablece 6d</span>
+          </div>
+          <div class="ptrack"><div class="pfill blue" style="width:8%"></div></div>
+        </div>
+      </div>
+
+      <!-- Our injected widget -->
+      <span class="label-ours">Nuestra extensión (inyectado)</span>
+      <div id="ctt-widget">
+        <div class="ctt-header">
+          <span>Token Tracker</span>
+          <span>→</span>
+        </div>
+        <div class="ctt-row">
+          <div class="ctt-row-labels">
+            <span class="ctt-label">Diario · todos los modelos</span>
+            <span class="ctt-stat" id="ctt-daily-stat">347.8K · restablece 5h</span>
+          </div>
+          <div class="ctt-track">
+            <div class="ctt-fill orange" id="ctt-daily-fill" style="width:34.8%"></div>
+          </div>
+        </div>
+        <div class="ctt-row">
+          <div class="ctt-row-labels">
+            <span class="ctt-label">Semanal · todos los modelos</span>
+            <span class="ctt-stat" id="ctt-weekly-stat">2.14M · restablece 6d</span>
+          </div>
+          <div class="ctt-track">
+            <div class="ctt-fill blue" id="ctt-weekly-fill" style="width:30.6%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User row -->
+      <div class="user-row">
+        <div class="avatar">M</div>
+        <span>Manuel</span>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="main">
+    Interface de claude.ai (mock)
+  </div>
+
+  <div class="note">Preview — sin datos reales</div>
+
+  <script>
+    // Animate bars in on load
+    setTimeout(() => {
+      document.getElementById("ctt-daily-fill").style.width  = "34.8%";
+      document.getElementById("ctt-weekly-fill").style.width = "30.6%";
+    }, 200);
+  </script>
+</body>
+</html>
