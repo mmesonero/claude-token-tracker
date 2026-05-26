@@ -200,11 +200,25 @@ function render(usage) {
     </div>`;
 }
 
-function load() {
-  chrome.runtime.sendMessage({ type: "GET_USAGE" }, (res) => {
-    if (chrome.runtime.lastError || !res?.liveUsage) {
-      document.getElementById("content").innerHTML =
-        `<div class="state">Sin datos aún.<small>Abre claude.ai para cargar el uso.</small></div>`;
+function showError(msg) {
+  document.getElementById("content").innerHTML =
+    `<div class="state">${msg}</div>`;
+}
+
+async function load() {
+  // Timeout: si el background no responde en 8s, muestra error
+  const timeout = new Promise((_, rej) => setTimeout(() => rej("timeout"), 8000));
+  const msg     = new Promise((res, rej) => {
+    chrome.runtime.sendMessage({ type: "GET_USAGE" }, (r) => {
+      if (chrome.runtime.lastError) rej(chrome.runtime.lastError.message);
+      else res(r);
+    });
+  });
+
+  try {
+    const res = await Promise.race([msg, timeout]);
+    if (!res?.liveUsage) {
+      showError("Sin datos.<small>Asegúrate de estar logueado en claude.ai en Chrome.</small>");
       return;
     }
     render(res.liveUsage);
@@ -213,11 +227,12 @@ function load() {
       document.getElementById("updated").textContent =
         "Actualizado " + d.toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" });
     }
-  });
+  } catch (e) {
+    showError(`Error: ${e}<small>Recarga la extensión en chrome://extensions</small>`);
+  }
 }
 
 load();
-// Refresca cada minuto por si acaso
 setInterval(load, 60_000);
 </script>
 </body>
