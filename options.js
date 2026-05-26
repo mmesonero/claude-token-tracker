@@ -15,7 +15,7 @@ function msg(type, data) {
 
 // ── Load current settings ─────────────────────────────────────────────────────
 async function loadAll() {
-  const stats = await msg("GET_STATS");
+  const stats = await msg("GET_STATS") || {};
   const { limits = DEFAULT_LIMITS } = stats;
 
   document.getElementById("dailyLimit").value  = limits.daily;
