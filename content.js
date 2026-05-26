@@ -8,15 +8,29 @@
   sc.onload = () => sc.remove();
   (document.head || document.documentElement).appendChild(sc);
 
+  // ── Context guard — returns false when extension is reloaded/invalidated ──
+  function alive() {
+    try { return !!chrome.runtime?.id; } catch { return false; }
+  }
+
+  // Auto-cleanup: remove widget + styles when context dies
+  function teardown() {
+    document.getElementById("ctt-bar")?.remove();
+    document.getElementById("ctt-style")?.remove();
+  }
+
   // ── 2. Bridge: page → background (token counting) ────────────────────────
   window.addEventListener("message", (ev) => {
     if (ev.source !== window || ev.data?.type !== "CLAUDE_TOKEN_USAGE") return;
+    if (!alive()) return;
     const { model, inputTokens, outputTokens } = ev.data;
     if (!inputTokens && !outputTokens) return;
-    chrome.runtime.sendMessage(
-      { type: "UPDATE_USAGE", data: { model, inputTokens: inputTokens || 0, outputTokens: outputTokens || 0 } },
-      () => void chrome.runtime.lastError
-    );
+    try {
+      chrome.runtime.sendMessage(
+        { type: "UPDATE_USAGE", data: { model, inputTokens: inputTokens || 0, outputTokens: outputTokens || 0 } },
+        () => void chrome.runtime.lastError
+      );
+    } catch { /* context gone */ }
   });
 
   // ── 3. API: get org ID + real usage ──────────────────────────────────────
@@ -180,6 +194,8 @@
   // ── 7. Update widget with real API data ───────────────────────────────────
 
   async function updateWidget() {
+    if (!alive()) { teardown(); return; }
+
     const dFill = document.getElementById("ctt-d-fill");
     const wFill = document.getElementById("ctt-w-fill");
     const dVal  = document.getElementById("ctt-d-val");
@@ -222,12 +238,16 @@
     boot();
   }
 
-  // Refresh data every 5 min
-  setInterval(updateWidget, 5 * 60_000);
+  // Refresh data every 5 min — bail if context gone
+  const refreshTimer = setInterval(() => {
+    if (!alive()) { clearInterval(refreshTimer); clearInterval(navTimer); teardown(); return; }
+    updateWidget();
+  }, 5 * 60_000);
 
-  // Re-inject after SPA navigation
+  // Re-inject after SPA navigation — bail if context gone
   let lastPath = location.pathname;
-  setInterval(() => {
+  const navTimer = setInterval(() => {
+    if (!alive()) { clearInterval(refreshTimer); clearInterval(navTimer); teardown(); return; }
     if (location.pathname !== lastPath) {
       lastPath = location.pathname;
       const old = document.getElementById(ID);
