@@ -116,6 +116,31 @@ async function exportData() {
   return usage;
 }
 
+// ─── Fetch usage directly from background (uses Chrome's cookie store) ───────
+
+async function getOrgId() {
+  // Cookie via chrome.cookies API (most reliable)
+  try {
+    const cookie = await chrome.cookies.get({ url: "https://claude.ai", name: "lastActiveOrg" });
+    if (cookie?.value) return cookie.value;
+  } catch (_) {}
+  return null;
+}
+
+async function fetchLiveUsage() {
+  const orgId = await getOrgId();
+  if (!orgId) return null;
+  try {
+    const r = await fetch(`https://claude.ai/api/organizations/${orgId}/usage`, {
+      credentials: "include",
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    await chrome.storage.local.set({ liveUsage: data, liveUsageAt: Date.now() });
+    return data;
+  } catch (_) { return null; }
+}
+
 // ─── Open dashboard tab on icon click ────────────────────────────────────────
 
 chrome.action.onClicked.addListener(() => {
@@ -152,8 +177,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true;
 
     case "GET_USAGE":
-      chrome.storage.local.get(["liveUsage", "liveUsageAt"])
-        .then(sendResponse).catch(console.error);
+      fetchLiveUsage().then((liveUsage) => {
+        sendResponse({ liveUsage, liveUsageAt: Date.now() });
+      }).catch(() => sendResponse({ liveUsage: null }));
       return true;
   }
 });
