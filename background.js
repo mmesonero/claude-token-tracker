@@ -116,6 +116,12 @@ async function exportData() {
   return usage;
 }
 
+// ─── Open dashboard tab on icon click ────────────────────────────────────────
+
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+});
+
 // ─── Message Listener ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -138,6 +144,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
     case "EXPORT_DATA":
       exportData().then(sendResponse).catch(console.error);
+      return true;
+
+    case "STORE_USAGE":
+      chrome.storage.local.set({ liveUsage: msg.data, liveUsageAt: Date.now() })
+        .then(() => sendResponse({ ok: true }));
+      return true;
+
+    case "GET_USAGE":
+      chrome.storage.local.get(["liveUsage", "liveUsageAt"])
+        .then(sendResponse).catch(console.error);
       return true;
   }
 });

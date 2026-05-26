@@ -209,6 +209,12 @@
       return;
     }
 
+    // Store for dashboard tab
+    try {
+      chrome.runtime.sendMessage({ type: "STORE_USAGE", data: usage },
+        () => void chrome.runtime.lastError);
+    } catch { /* context gone */ }
+
     const dPct = usage.five_hour?.utilization ?? 0;
     const wPct = usage.seven_day?.utilization ?? 0;
     const dReset = fmtReset(usage.five_hour?.resets_at, "five_hour");
