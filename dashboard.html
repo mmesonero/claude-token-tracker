@@ -29,12 +29,9 @@
   }
   .logo {
     width: 28px; height: 28px;
-    background: #D4670F;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
-  .logo svg { display: block; }
+  .logo img { display: block; width: 100%; height: 100%; }
   .header-text h1 {
     font-size: 16px;
     font-weight: 600;
@@ -125,17 +122,34 @@
     font-size: 10.5px;
     color: rgba(255,253,247,.18);
   }
+
+  /* ── Footer links ── */
+  .footer {
+    margin-top: 28px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .footer a {
+    font-size: 11px;
+    color: rgba(255,253,247,.2);
+    text-decoration: none;
+    letter-spacing: .01em;
+    transition: color .2s;
+  }
+  .footer a:hover { color: rgba(255,253,247,.5); }
+  .footer-sep {
+    width: 1px;
+    height: 10px;
+    background: rgba(255,253,247,.1);
+  }
 </style>
 </head>
 <body>
 
 <div class="header">
   <div class="logo">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <rect x="1" y="8"  width="2.5" height="4" rx=".8" fill="white" opacity=".9"/>
-      <rect x="5" y="5"  width="2.5" height="7" rx=".8" fill="white" opacity=".9"/>
-      <rect x="9" y="2"  width="2.5" height="10" rx=".8" fill="white" opacity=".9"/>
-    </svg>
+    <img src="icons/icon48.png" alt="Claude Token Tracker"/>
   </div>
   <div class="header-text">
     <h1>Usage</h1>
@@ -148,6 +162,12 @@
 </div>
 
 <div class="updated" id="updated"></div>
+
+<div class="footer">
+  <a href="https://github.com/mmesonero" target="_blank">GitHub</a>
+  <div class="footer-sep"></div>
+  <a href="https://www.linkedin.com/in/mesonero/" target="_blank">LinkedIn</a>
+</div>
 
 <script src="dashboard.js"></script>
 </body>
