@@ -134,6 +134,7 @@ function renderModels(containerId, models) {
 function drawSparkline(history) {
   const canvas = document.getElementById("sparkCanvas");
   if (!canvas) return;
+  if (!history || history.length < 2) return; // need ≥2 points to draw a line
 
   const dpr = window.devicePixelRatio || 1;
   const W   = canvas.offsetWidth  || 286;

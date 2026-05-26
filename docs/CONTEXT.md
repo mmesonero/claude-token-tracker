@@ -10,7 +10,25 @@ Anthropic's console shows historical usage but there is no live per-session widg
 
 ## Data Source Strategy
 
-### Primary: SSE interception on claude.ai (no auth needed)
+### Primary: Direct usage API (claude.ai session cookies)
+
+`content.js` fetches `/api/organizations/{orgId}/usage` directly using the browser's existing claude.ai session cookies. The response contains:
+
+```json
+{
+  "five_hour":  { "utilization": 0.84, "resets_at": "2026-05-26T15:00:00Z" },
+  "seven_day":  { "utilization": 0.08, "resets_at": "2026-06-01T00:00:00Z" }
+}
+```
+
+This powers the **inline widget** injected below the claude.ai input box. Refreshed every 5 minutes.
+
+Org ID is resolved via (in priority order):
+1. `lastActiveOrg` cookie (`document.cookie` regex match)
+2. `window.__NEXT_DATA__.props.pageProps.bootstrapData.organization.uuid`
+3. `/api/bootstrap` endpoint
+
+### Secondary: SSE stream interception (token-level counts)
 
 When claude.ai streams a response, it receives Server-Sent Events from Anthropic's backend. Each stream includes:
 
@@ -20,37 +38,65 @@ data: {"type":"message_start","message":{"model":"claude-sonnet-4-6","usage":{"i
 data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":187}}
 ```
 
-The extension injects a tiny script into the **page context** (not content-script context) to wrap `window.fetch`, clone streamed responses, and parse these events without touching the real response the page sees.
+**How it works:**
 
-### Secondary (future): Anthropic Console API
+1. `content.js` injects `page-inject.js` into the **page context** (not content-script isolated world) via a `<script src>` tag at `document_start`.
+2. `page-inject.js` wraps `window.fetch`, clones any matching SSE response, and parses `message_start` + `message_delta` events.
+3. Token counts are sent back via `window.postMessage({ type: "CLAUDE_TOKEN_USAGE", ... }, origin)`.
+4. `content.js` listens to `window.addEventListener("message")`, validates the source, and forwards via `chrome.runtime.sendMessage({ type: "UPDATE_USAGE", data })`.
+5. `background.js` stores the counts in `chrome.storage.local` keyed by date.
 
-If Anthropic exposes a billing/usage REST endpoint it could be polled with a user-supplied API key. Not implemented in v1.
+This powers the **popup** (daily/weekly totals, per-model breakdown, 7-day sparkline).
+
+## Architecture
+
+| Component | Role |
+|---|---|
+| `manifest.json` | MV3 manifest — permissions, content script, web_accessible_resources |
+| `content.js` | Runs on claude.ai: injects page-inject.js, bridges postMessage→background, renders widget |
+| `page-inject.js` | Page-context fetch wrapper — intercepts SSE streams, emits postMessage |
+| `background.js` | Service worker — storage, aggregation, message handler, opens dashboard tab |
+| `popup.html/js/css` | Extension popup UI — shown when icon is clicked (via dashboard.html full tab) |
+| `options.html/js/css` | Settings page — limit presets, data export/reset |
 
 ## Architecture Decisions
 
 | Decision | Choice | Reason |
 |---|---|---|
 | Manifest version | V3 | Required for new Chrome extensions |
-| Page injection | `web_accessible_resources` script | Only way to override `window.fetch` in page context under MV3 |
+| Page injection | `web_accessible_resources` + `<script src>` | Only way to override `window.fetch` in page context under MV3 |
 | Communication | `window.postMessage` → content script → `chrome.runtime.sendMessage` | Standard safe cross-context bridge |
-| Storage | `chrome.storage.local` | Persists across browser restarts, syncs not needed |
+| Storage | `chrome.storage.local` | Persists across browser restarts; sync not needed |
 | Data retention | 30 rolling days | Enough for weekly views, avoids storage bloat |
 | Week start | Monday | ISO standard |
 | Token limits | User-configurable, sane defaults | No public API for plan limits |
+| Dashboard | Full tab via `chrome.action.onClicked` | Better real estate than a popup for stats |
 
 ## URL Patterns Intercepted
 
-The extension watches `https://claude.ai/*` and looks for fetch calls that match:
-- Contains `/completion`
-- Contains `/chat_conversations`  
-- Contains `/append_message`
+`page-inject.js` watches fetch calls matching any of:
+- `/completion`
+- `/chat_conversations`
+- `/append_message`
 
-These are the known claude.ai completion endpoint patterns. If Anthropic changes their routing, the patterns in `page-inject.js` need updating.
+No host filter needed — the script only loads on `https://claude.ai/*` per `web_accessible_resources`.
+
+## Message Types (content ↔ background)
+
+| Message type | Direction | Payload |
+|---|---|---|
+| `UPDATE_USAGE` | content → background | `{ model, inputTokens, outputTokens }` |
+| `GET_STATS` | popup/dashboard → background | — |
+| `SET_LIMITS` | options → background | `{ daily, weekly }` |
+| `RESET_DATA` | popup/options → background | — |
+| `EXPORT_DATA` | options → background | — |
+| `STORE_USAGE` | content → background | raw API usage object |
+| `REFRESH_USAGE` | dashboard → background | — (triggers fetchLiveUsage) |
 
 ## Known Limitations
 
 - **Only works on claude.ai** — does not track API usage made from third-party apps
 - **Session-based** — if the browser closes mid-stream, partial counts may be missed
-- **Model attribution** — model comes from `message_start` event; unknown if claude.ai overrides it
+- **Model attribution** — model comes from `message_start` event
 - **No rate-limit info** — actual plan limits are not exposed by claude.ai; defaults are estimates
-- **Free-tier users** — Anthropic may use message counts not token counts; progress bar still shows tokens
+- **Free-tier users** — Anthropic may use message counts, not token counts; progress bar still shows tokens

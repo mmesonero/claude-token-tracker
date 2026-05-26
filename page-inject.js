@@ -101,7 +101,9 @@
           ? args[0].url
           : String(args[0]);
 
-      if (url.includes("claude.ai") && matchesClaudeAPI(url)) {
+      // page-inject.js only runs on claude.ai (web_accessible_resources match),
+      // so no need to re-check the host — just match the path patterns.
+      if (matchesClaudeAPI(url)) {
         // Clone so we can consume the stream independently
         // (the real response goes to the page untouched)
         const cloned = response.clone();
