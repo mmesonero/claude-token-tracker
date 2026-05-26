@@ -1,85 +1,87 @@
 # Claude Token Tracker
 
-Browser extension that shows your Claude AI token consumption as Anthropic-styled progress bars — daily and weekly, broken down by model.
+Extensión de Chrome que muestra tu uso real de tokens de Claude directamente en la interfaz de claude.ai — integrado debajo del cuadro de chat, sin popups ni ventanas aparte.
 
-![popup preview: orange progress bars, Claude dark orange on white, Today / This Week tabs]
+## Resultado
 
-## Features
+```
+      Sesión ████████░░ 57% · 4h 26m  │  Semanal ████░░░░░░ 24% · lun 11:00
+┌──────────────────────────────────────────────────────────────────────┐
+│ Escribe un mensaje...                                                │
+│ +                              Sonnet 4.6 Adaptativo    🎙  ||||    │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
-- **Live tracking** — intercepts claude.ai streaming responses; no API key needed
-- **Daily & weekly views** — see tokens used today vs. this week
-- **All models** — Sonnet, Opus, Haiku, Haiku 4.5, etc. tracked separately
-- **Input / Output split** — know whether you're spending on context or generation
-- **Configurable limits** — set your own daily/weekly cap in Settings
-- **Compact** — 320 px popup, zero injected UI on the page
+## Qué muestra
 
-## Quick Start
+| Campo | Fuente | Descripción |
+|---|---|---|
+| **Sesión** (naranja) | `five_hour.utilization` | Uso del límite de sesión (5h) en % |
+| **Semanal** (azul) | `seven_day.utilization` | Uso semanal de todos los modelos en % |
+| Tiempo de reset | `resets_at` | Para sesión: relativo ("4h 26m"). Para semanal: absoluto ("lun 11:00") |
 
-### 1. Generate icons (first time only)
+Los datos vienen de la API real de Anthropic: `/api/organizations/{orgId}/usage`. Se refrescan cada 5 minutos automáticamente.
+
+## Instalación
+
+### 1. Generar iconos (solo la primera vez)
 
 ```bash
 cd claude-token-tracker
 node make-icons.js
 ```
 
-Requires Node.js 16+. Creates `icons/icon16.png`, `icon48.png`, `icon128.png`.
+### 2. Cargar en Chrome
 
-### 2. Load as unpacked extension
+1. `chrome://extensions`
+2. Activar **"Modo de desarrollador"** (arriba derecha)
+3. Click **"Cargar descomprimida"**
+4. Seleccionar la carpeta `claude-token-tracker`
 
-1. Open Chrome → `chrome://extensions`
-2. Enable **Developer mode** (top-right toggle)
-3. Click **Load unpacked**
-4. Select the `claude-token-tracker/` folder
+### 3. Usar
 
-The extension icon appears in the toolbar.
+Ve a **claude.ai** — el widget aparece automáticamente debajo del cuadro de mensaje.
 
-### 3. Use it
+## Compatibilidad
 
-1. Go to **claude.ai** and have any conversation
-2. Click the extension icon to see your usage
-
-## Settings
-
-Click ⚙ in the popup or go to the extension's Options page to configure:
-
-- **Daily limit** (default: 1,000,000 tokens)
-- **Weekly limit** (default: 7,000,000 tokens)
-- **Export data** as JSON
-- **Reset all data**
-
-> **Note:** Anthropic doesn't publish exact token limits per plan. The defaults are reasonable estimates for the Pro plan. Adjust to match your actual plan limits.
-
-## How It Works
-
-The extension injects a tiny script into the claude.ai page context that wraps `window.fetch`. When a completion response streams back, it clones the response (without affecting the real stream), reads the Server-Sent Events, and extracts token counts from `message_start` and `message_delta` events. Data is stored locally in `chrome.storage.local` — nothing leaves your browser.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) and [CONTEXT.md](CONTEXT.md) for full technical details.
-
-## Browser Compatibility
-
-| Browser | Status |
+| Navegador | Estado |
 |---|---|
-| Chrome 109+ | ✅ Fully supported |
-| Edge 109+ | ✅ Fully supported (Chromium) |
-| Firefox | 🔜 Planned (MV2 compatible port) |
-| Safari | 🔜 Planned |
+| Chrome 109+ | ✅ |
+| Edge 109+ | ✅ (Chromium) |
+| Firefox | 🔜 |
+| App de escritorio Claude | 🔜 En investigación |
 
-## Roadmap
+## Arquitectura
 
-- [ ] Firefox / Safari port
-- [ ] Optional Anthropic API key for historical usage fetch
-- [ ] Daily usage chart (7-day sparkline)
-- [ ] Notification when approaching limit
-- [ ] Claude desktop app integration
-
-## Development
-
-```bash
-# After making changes to any .js file:
-# Go to chrome://extensions → find the extension → click the refresh icon
-# (No build step needed — plain JS, no bundler)
+```
+page-inject.js     Intercepta window.fetch en el contexto de la página
+       ↓
+content.js         Puente isolated world → background. Inyecta el widget.
+                   Llama a /api/organizations/{orgId}/usage para datos reales.
+       ↓
+background.js      Service worker — almacena histórico local (30 días)
+       ↓
+popup.html         Vista detallada: Today / This Week + sparkline 7 días
+options.html       Configurar límites, exportar datos, reset
 ```
 
-## License
+## Desarrollo
+
+Sin build step. Edita los `.js`, recarga la extensión en `chrome://extensions` (botón 🔄), recarga `claude.ai`.
+
+```
+claude-token-tracker/
+├── manifest.json
+├── background.js        Service worker
+├── content.js           Widget injection + API fetch
+├── page-inject.js       Fetch interceptor (contexto de página)
+├── popup.html/css/js    Popup detallado
+├── options.html/css/js  Configuración
+├── make-icons.js        Generador de PNGs sin dependencias
+├── icons/               icon16/48/128.png
+└── docs/                README, ARCHITECTURE, CONTEXT
+```
+
+## Licencia
 
 MIT
