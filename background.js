@@ -142,19 +142,44 @@ async function fetchLiveUsage() {
   }
 }
 
-// ─── Open dashboard tab on icon click ────────────────────────────────────────
+// ─── Open dashboard as a centered popup window ───────────────────────────────
 
-chrome.action.onClicked.addListener(() => {
+const DASH_W = 400;
+const DASH_H = 420;
+let dashWindowId = null;
+
+chrome.action.onClicked.addListener(async () => {
   const dashUrl = chrome.runtime.getURL("dashboard.html");
-  chrome.tabs.query({ url: dashUrl }, (existing) => {
-    if (existing.length > 0) {
-      chrome.tabs.remove(existing.map(t => t.id), () => {
-        chrome.tabs.create({ url: dashUrl });
-      });
-    } else {
-      chrome.tabs.create({ url: dashUrl });
+
+  // If already open — just focus it
+  if (dashWindowId !== null) {
+    try {
+      await chrome.windows.update(dashWindowId, { focused: true });
+      return;
+    } catch {
+      dashWindowId = null; // window was closed externally
     }
+  }
+
+  // Center relative to the current browser window
+  const cur  = await chrome.windows.getCurrent();
+  const left = Math.round(cur.left + (cur.width  - DASH_W) / 2);
+  const top  = Math.round(cur.top  + (cur.height - DASH_H) / 2);
+
+  const win = await chrome.windows.create({
+    url:    dashUrl,
+    type:   "popup",
+    width:  DASH_W,
+    height: DASH_H,
+    left,
+    top,
   });
+  dashWindowId = win.id;
+});
+
+// Clean up tracked ID when the window is closed
+chrome.windows.onRemoved.addListener((windowId) => {
+  if (windowId === dashWindowId) dashWindowId = null;
 });
 
 // ─── Message Listener ─────────────────────────────────────────────────────────
