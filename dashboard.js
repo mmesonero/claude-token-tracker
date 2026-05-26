@@ -1,4 +1,4 @@
-// dashboard.js — auto-refreshes every 60 s; reacts instantly to storage changes
+// dashboard.js — refreshes every 60 s; badge always live, goes grey on disconnect
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -15,18 +15,21 @@ function fmtReset(iso, type) {
     String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 }
 
-// ── Live badge flash ──────────────────────────────────────────────────────────
+// ── Live badge — always green, goes grey if no data for DISCONNECT_MS ─────────
 
-function flashLive() {
+const DISCONNECT_MS = 90_000; // 90 s without an update → disconnected
+let disconnectTimer = null;
+
+function setLive(connected) {
   const badge = document.getElementById("liveBadge");
   if (!badge) return;
-  badge.classList.remove("active");
-  // force reflow so animation restarts
-  void badge.offsetWidth;
-  badge.classList.add("active");
-  // fade out after animation
-  clearTimeout(flashLive._timer);
-  flashLive._timer = setTimeout(() => badge.classList.remove("active"), 2000);
+  badge.classList.toggle("active", connected);
+}
+
+function keepAlive() {
+  setLive(true);
+  clearTimeout(disconnectTimer);
+  disconnectTimer = setTimeout(() => setLive(false), DISCONNECT_MS);
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -69,7 +72,7 @@ function render(usage) {
   document.getElementById("updated").textContent =
     "Updated at " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-  flashLive();
+  keepAlive();
 }
 
 function showWaiting() {
@@ -89,26 +92,10 @@ function requestRefresh() {
   chrome.runtime.sendMessage({ type: "REFRESH_USAGE" }, () => void chrome.runtime.lastError);
 }
 
-// ── Countdown (1-second tick) ─────────────────────────────────────────────────
-
-const REFRESH_INTERVAL = 60; // seconds
-let secondsLeft = REFRESH_INTERVAL;
-
-function tickCountdown() {
-  secondsLeft--;
-  const el = document.getElementById("countdown");
-  if (el) el.textContent = secondsLeft;
-
-  if (secondsLeft <= 0) {
-    secondsLeft = REFRESH_INTERVAL;
-    requestRefresh();
-  }
-}
-
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function init() {
-  // Show cached data immediately if available
+  // Show cached data immediately; badge starts live
   const hasCached = await loadFromStorage();
   if (!hasCached) showWaiting();
 
@@ -119,15 +106,11 @@ async function init() {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.liveUsage?.newValue) {
       render(changes.liveUsage.newValue);
-      // Reset countdown so it reflects actual last-refresh time
-      secondsLeft = REFRESH_INTERVAL;
-      const el = document.getElementById("countdown");
-      if (el) el.textContent = secondsLeft;
     }
   });
 
-  // Tick every second for countdown display; refresh every 60 s
-  setInterval(tickCountdown, 1_000);
+  // Poll every 60 s as fallback (storage.onChanged handles instant updates)
+  setInterval(requestRefresh, 60_000);
 }
 
 init();
