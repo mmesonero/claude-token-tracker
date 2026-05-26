@@ -193,6 +193,15 @@
 
   // ── 7. Update widget with real API data ───────────────────────────────────
 
+  // ── Push data to VS Code extension (if open) ─────────────────────────────
+  function pushToVSCode(usage) {
+    fetch("http://localhost:27182/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(usage),
+    }).catch(() => { /* VS Code not open — silently ignore */ });
+  }
+
   async function updateWidget() {
     if (!alive()) { teardown(); return; }
 
@@ -208,6 +217,9 @@
       wVal.textContent = "sin datos";
       return;
     }
+
+    // Push to VS Code whenever we have fresh data
+    pushToVSCode(usage);
 
     const dPct = usage.five_hour?.utilization ?? 0;
     const wPct = usage.seven_day?.utilization ?? 0;
