@@ -150,7 +150,16 @@ async function fetchLiveUsage() {
 // ─── Open dashboard tab on icon click ────────────────────────────────────────
 
 chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
+  const dashUrl = chrome.runtime.getURL("dashboard.html");
+  chrome.tabs.query({ url: dashUrl }, (existing) => {
+    if (existing.length > 0) {
+      chrome.tabs.remove(existing.map(t => t.id), () => {
+        chrome.tabs.create({ url: dashUrl });
+      });
+    } else {
+      chrome.tabs.create({ url: dashUrl });
+    }
+  });
 });
 
 // ─── Message Listener ─────────────────────────────────────────────────────────
