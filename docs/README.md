@@ -1,103 +1,79 @@
 # Claude Token Tracker
 
-Extensión de Chrome que muestra el uso real de límites de Claude directamente en claude.ai — widget integrado debajo del chat + pestaña dashboard al clicar el icono.
+Chrome extension that displays real-time Claude usage limits directly on claude.ai — an inline widget below the chat box, and a floating dashboard window when you click the extension icon.
 
-## Resultado
+## What it shows
 
-### Widget en claude.ai
-```
-Sesión ████████░░ 25% · 4h 18m  │  Semanal ████░░░░░░ 29% · lun 13:00
-┌──────────────────────────────────────────────────────────────────────┐
-│ Escribe un mensaje...                                                │
-│ +                              Sonnet 4.6 Adaptativo    🎙  ||||    │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-### Dashboard (nueva pestaña al clicar el icono)
-
-Pestaña minimalista con fondo oscuro. Dos tarjetas: Sesión (5h) y Semanal, con barra de progreso y tiempo de reset. Icono propio de la extensión en header y favicon. Links a GitHub y LinkedIn en footer. Se refresca automáticamente cada 5 min.
-
-## Qué muestra
-
-| Campo | Fuente API | Descripción |
+| Field | API source | Description |
 |---|---|---|
-| **Sesión** (naranja) | `five_hour.utilization` | % del límite de sesión (ventana de 5h) |
-| **Semanal** (azul) | `seven_day.utilization` | % del límite semanal (todos los modelos) |
-| Reset sesión | `five_hour.resets_at` | Tiempo relativo: "4h 18m" |
-| Reset semanal | `seven_day.resets_at` | Día y hora: "lun 13:00" |
+| **5h limit** (orange) | `five_hour.utilization` | % of the 5-hour session limit |
+| **Weekly** (blue) | `seven_day.utilization` | % of the weekly limit (all models) |
+| Reset time | `five_hour.resets_at` / `seven_day.resets_at` | Absolute day + time: "Wed 04:40" |
 
-Datos de la API real: `/api/organizations/{orgId}/usage`. OrgId extraído del cookie `lastActiveOrg`.
+Data comes from the real API: `/api/organizations/{orgId}/usage`. Org ID is read from the `lastActiveOrg` cookie.
 
-## Instalación
+## Install
 
-### 1. Generar iconos (solo primera vez)
+1. Open `chrome://extensions`
+2. Enable **Developer mode** (top right)
+3. Click **Load unpacked**
+4. Select the `claude-token-tracker` folder
 
-```bash
-cd claude-token-tracker
-node make-icons.js
-```
+> Icons are pre-generated in `icons/`. To regenerate them run `node make-icons.js` (Node.js, no dependencies).
 
-### 2. Cargar en Chrome
+## Usage
 
-1. Abrir `chrome://extensions`
-2. Activar **"Modo de desarrollador"** (arriba derecha)
-3. Clic **"Cargar descomprimida"**
-4. Seleccionar la carpeta `claude-token-tracker`
+- **Widget** — go to **claude.ai**, the bar appears automatically below the message input
+- **Dashboard** — click the extension icon in the Chrome toolbar → a floating window opens centered on the current browser window
 
-### 3. Usar
+## Auto-update
 
-- **Widget**: ve a **claude.ai** — aparece automáticamente debajo del cuadro de mensaje
-- **Dashboard**: clic en el icono de la extensión en la barra de Chrome → abre nueva pestaña
+The extension checks for updates every minute by comparing its local `manifest.json` version against the one on GitHub. If a newer version is found:
 
-## Compatibilidad
+- The toolbar icon shows an **↑** badge
+- The dashboard shows an orange banner with a **Reload** button
 
-| Navegador | Estado |
+To update: `git pull` in the project folder, then click **Reload** (or go to `chrome://extensions` and reload manually).
+
+## Compatibility
+
+| Browser | Status |
 |---|---|
 | Chrome 109+ | ✅ |
 | Edge 109+ | ✅ (Chromium) |
-| Firefox | ❌ MV3 diferente |
+| Firefox | ❌ Different MV3 implementation |
 
-## Arquitectura
+## Architecture
 
 ```
-content.js         Inyecta widget debajo del chat en claude.ai.
-                   Llama a /api/organizations/{orgId}/usage cada 5 min.
-                   Guarda datos en chrome.storage.local via STORE_USAGE.
-       ↓
-background.js      Service worker. Al clicar icono → abre dashboard.html.
-                   Fetch directo a la API usando cookie store de Chrome.
-                   Handlers: REFRESH_USAGE, STORE_USAGE, GET_STATS, etc.
-       ↓
-dashboard.html     Nueva pestaña — header con icono propio, dos tarjetas,
-dashboard.js       footer con links. Lee liveUsage de storage, onChanged
-                   para updates reactivos. JS externo (MV3 CSP).
-
-page-inject.js     Interceptor de window.fetch (contexto de página).
+page-inject.js     Runs in page context — wraps window.fetch, parses SSE streams.
+       ↓ postMessage
+content.js         Receives token counts, forwards to background.
+                   Injects the inline widget. Calls /api/.../usage every 5 min.
+       ↓ chrome.runtime.sendMessage
+background.js      Service worker. Opens dashboard window on icon click.
+                   Fetches live usage via Chrome cookie store (REFRESH_USAGE).
+                   Checks GitHub for updates every 1 min.
+       ↓ chrome.storage.local
+dashboard.js       Reads liveUsage from storage. Reacts instantly via onChanged.
+                   Requests refresh every 60 s as fallback.
 ```
 
-## Estructura de archivos
+## File map
 
 ```
 claude-token-tracker/
 ├── manifest.json        MV3 manifest
 ├── background.js        Service worker
-├── content.js           Widget en claude.ai + bridge API → storage
-├── page-inject.js       Interceptor fetch (contexto de página)
-├── dashboard.html       Pestaña dashboard
-├── dashboard.js         Lógica dashboard (externo — MV3 CSP)
-├── options.html/css/js  Página de opciones
-├── make-icons.js        Generador de PNGs (sin dependencias)
-├── icons/               icon16/48/128.png — barras ascendentes sobre círculo naranja
+├── content.js           Widget + postMessage bridge + API polling
+├── page-inject.js       Fetch interceptor (page context)
+├── dashboard.html/js    Floating dashboard window
+├── options.html/css/js  Settings page
+├── make-icons.js        PNG icon generator (Node.js, no deps)
+├── icons/               icon16/48/128.png
 └── docs/                README, ARCHITECTURE, CONTEXT
 ```
 
-## Notas técnicas
-
-- **MV3 CSP**: scripts inline en páginas de extensión están bloqueados — JS siempre en archivo externo
-- **Background fetch**: el service worker hace fetch con `credentials: "include"` a dominios declarados en `host_permissions`
-- **Storage como canal**: `chrome.storage.local` + `onChanged` en vez de `sendMessage`/`sendResponse` (poco fiable con service workers dormidos)
-- **Iconos**: generados con `make-icons.js` (Node.js puro, sin deps) — PNG con círculo naranja y barras ascendentes
-
-## Licencia
+## License
 
 MIT

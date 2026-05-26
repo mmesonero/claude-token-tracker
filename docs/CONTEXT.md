@@ -40,13 +40,13 @@ data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"outpu
 
 **How it works:**
 
-1. `content.js` injects `page-inject.js` into the **page context** (not content-script isolated world) via a `<script src>` tag at `document_start`.
+1. `content.js` injects `page-inject.js` into the **page context** (not the content-script isolated world) via a `<script src>` tag at `document_start`.
 2. `page-inject.js` wraps `window.fetch`, clones any matching SSE response, and parses `message_start` + `message_delta` events.
 3. Token counts are sent back via `window.postMessage({ type: "CLAUDE_TOKEN_USAGE", ... }, origin)`.
 4. `content.js` listens to `window.addEventListener("message")`, validates the source, and forwards via `chrome.runtime.sendMessage({ type: "UPDATE_USAGE", data })`.
 5. `background.js` stores the counts in `chrome.storage.local` keyed by date.
 
-This powers the **popup** (daily/weekly totals, per-model breakdown, 7-day sparkline).
+This powers the **options page** stats (all-time total, days with data, export).
 
 ## Architecture
 
@@ -55,8 +55,8 @@ This powers the **popup** (daily/weekly totals, per-model breakdown, 7-day spark
 | `manifest.json` | MV3 manifest — permissions, content script, web_accessible_resources |
 | `content.js` | Runs on claude.ai: injects page-inject.js, bridges postMessage→background, renders widget |
 | `page-inject.js` | Page-context fetch wrapper — intercepts SSE streams, emits postMessage |
-| `background.js` | Service worker — storage, aggregation, message handler, opens dashboard tab |
-| `popup.html/js/css` | Extension popup UI — shown when icon is clicked (via dashboard.html full tab) |
+| `background.js` | Service worker — storage, aggregation, message handler, opens dashboard window |
+| `dashboard.html/js` | Floating window opened on icon click — shows live 5h + weekly usage |
 | `options.html/js/css` | Settings page — limit presets, data export/reset |
 
 ## Architecture Decisions
@@ -70,7 +70,7 @@ This powers the **popup** (daily/weekly totals, per-model breakdown, 7-day spark
 | Data retention | 30 rolling days | Enough for weekly views, avoids storage bloat |
 | Week start | Monday | ISO standard |
 | Token limits | User-configurable, sane defaults | No public API for plan limits |
-| Dashboard | Full tab via `chrome.action.onClicked` | Better real estate than a popup for stats |
+| Dashboard | Floating popup window via `chrome.windows.create` | Better real estate than a browser tab; stays on top |
 
 ## URL Patterns Intercepted
 
@@ -86,12 +86,13 @@ No host filter needed — the script only loads on `https://claude.ai/*` per `we
 | Message type | Direction | Payload |
 |---|---|---|
 | `UPDATE_USAGE` | content → background | `{ model, inputTokens, outputTokens }` |
-| `GET_STATS` | popup/dashboard → background | — |
+| `GET_STATS` | options → background | — |
 | `SET_LIMITS` | options → background | `{ daily, weekly }` |
-| `RESET_DATA` | popup/options → background | — |
+| `RESET_DATA` | options → background | — |
 | `EXPORT_DATA` | options → background | — |
 | `STORE_USAGE` | content → background | raw API usage object |
 | `REFRESH_USAGE` | dashboard → background | — (triggers fetchLiveUsage) |
+| `RELOAD` | dashboard → background | — (triggers chrome.runtime.reload) |
 
 ## Known Limitations
 

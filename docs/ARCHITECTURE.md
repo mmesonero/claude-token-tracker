@@ -4,22 +4,22 @@
 
 ```
 claude-token-tracker/
-├── manifest.json          MV3 manifest — permissions, content scripts, action (no popup)
-├── background.js          Service worker — abre dashboard tab, fetch API, message bus
-├── content.js             Runs on claude.ai — inyecta widget, llama API, bridge a storage
-├── page-inject.js         Runs IN page context — wraps window.fetch (pasivo)
-├── dashboard.html         Nueva pestaña al clicar icono — UI oscura, dos tarjetas
-├── dashboard.js           Lógica dashboard — externo (MV3 CSP bloquea inline scripts)
-├── options.html/css/js    Página de opciones (legado)
-├── make-icons.js          Node.js — genera PNG sin deps externos
+├── manifest.json          MV3 manifest — permissions, content scripts, action (no default popup)
+├── background.js          Service worker — opens dashboard window, fetches API, message bus, update check
+├── content.js             Runs on claude.ai — injects widget, calls API, bridges storage
+├── page-inject.js         Runs in page context — wraps window.fetch (passive listener)
+├── dashboard.html         Floating popup window opened on icon click — dark UI, two cards
+├── dashboard.js           Dashboard logic — external file (MV3 CSP blocks inline scripts)
+├── options.html/css/js    Settings page — limit presets, data export/reset
+├── make-icons.js          Node.js — generates PNGs without external dependencies
 ├── icons/
 │   ├── icon16.png         16×16 toolbar icon
-│   ├── icon48.png         48×48 (usado en dashboard header + favicon)
+│   ├── icon48.png         48×48 (dashboard header + favicon)
 │   └── icon128.png        128×128 Chrome Web Store
 └── docs/
-    ├── CONTEXT.md         Decisiones y contexto del proyecto
-    ├── ARCHITECTURE.md    Este archivo
-    └── README.md          Setup e instalación
+    ├── CONTEXT.md         Project decisions and context
+    ├── ARCHITECTURE.md    This file
+    └── README.md          Setup and installation
 ```
 
 ## Data Flow
@@ -29,10 +29,10 @@ claude-token-tracker/
 │  claude.ai tab                                      │
 │                                                     │
 │  ┌─────────────────┐                               │
-│  │  page-inject.js │  wraps window.fetch (pasivo)  │
+│  │  page-inject.js │  wraps window.fetch (passive) │
 │  └─────────────────┘                               │
-│                                                     │
-│  ┌─────────────────┐                               │
+│           │ postMessage(CLAUDE_TOKEN_USAGE)         │
+│  ┌────────▼────────┐                               │
 │  │  content.js     │  fetch /api/organizations/    │
 │  │  (widget)       │        {orgId}/usage           │
 │  └────────┬────────┘                               │
@@ -44,11 +44,11 @@ claude-token-tracker/
   │  service worker │◄── chrome.cookies (lastActiveOrg)
   └────────┬────────┘
            │ fetch https://claude.ai/api/.../usage
-           │ (REFRESH_USAGE — desde dashboard o timer)
+           │ (REFRESH_USAGE — from dashboard or timer)
            ▼
   ┌─────────────────┐
   │  dashboard.js   │  chrome.storage.onChanged → render()
-  │  (nueva pestaña)│  setInterval REFRESH_USAGE cada 5 min
+  │  (popup window) │  setInterval REFRESH_USAGE every 60 s
   └─────────────────┘
 ```
 
@@ -59,7 +59,7 @@ claude-token-tracker/
 {
   liveUsage: {
     five_hour: {
-      utilization: 25.3,          // % de uso (0-100)
+      utilization: 25.3,          // usage % (0-100)
       resets_at: "2026-05-26T23:00:00Z"
     },
     seven_day: {
@@ -67,9 +67,9 @@ claude-token-tracker/
       resets_at: "2026-06-02T13:00:00Z"
     }
   },
-  liveUsageAt: 1748210400000,     // unix ms del último fetch
+  liveUsageAt: 1748210400000,     // unix ms of last fetch
 
-  // Legado (histórico local por token counting):
+  // Legacy (local token counting history):
   usage: {
     "2026-05-26": {
       input: 342100,
@@ -78,51 +78,59 @@ claude-token-tracker/
         "claude-sonnet-4-6": { input: 280000, output: 70000 }
       }
     }
-    // hasta 30 días
+    // up to 30 days rolling
   },
   limits: { daily: 1000000, weekly: 7000000 },
-  lastUpdated: 1748210400000
+  lastUpdated: 1748210400000,
+
+  // Update check:
+  updateAvailable: false,
+  remoteVersion: "1.2.0"
 }
 ```
 
 ## Message Protocol
 
-| Origen | Tipo | Payload | Respuesta |
+| Sender | Type | Payload | Response |
 |---|---|---|---|
-| content.js → background | `STORE_USAGE` | objeto `liveUsage` de la API | `{ok: true}` |
+| content.js → background | `STORE_USAGE` | raw `liveUsage` API object | `{ok: true}` |
 | dashboard.js → background | `REFRESH_USAGE` | — | `{ok: true}` (fire & forget) |
 | content.js → background | `UPDATE_USAGE` | `{model, inputTokens, outputTokens}` | `{ok: true}` |
-| cualquiera → background | `GET_STATS` | — | `{today, week, limits, lastUpdated}` |
+| any → background | `GET_STATS` | — | `{today, week, limits, lastUpdated, history}` |
 | options → background | `SET_LIMITS` | `{daily, weekly}` | `{ok: true}` |
-| options → background | `EXPORT_DATA` | — | objeto usage completo |
+| options → background | `EXPORT_DATA` | — | full usage object |
 | options → background | `RESET_DATA` | — | `{ok: true}` |
+| dashboard → background | `RELOAD` | — | `{ok: true}` then `chrome.runtime.reload()` |
 
 ## Design Tokens
 
 ```css
-/* Fondo / superficie */
---bg:       #0F0E0D   /* casi negro */
+/* Background / surface */
+--bg:       #0F0E0D   /* near black */
 --surface:  rgba(255,253,247,.04)
 --border:   rgba(255,253,247,.07)
 
-/* Texto */
+/* Text */
 --text:     #FFFDF7
 --muted:    rgba(255,253,247,.35)
 --dim:      rgba(255,253,247,.18)
 
-/* Acento */
---orange:   #D4670F   /* sesión (5h) */
+/* Accent */
+--orange:        #D4670F   /* 5h session limit */
 --orange-warn:   #F59E0B   /* ≥70% */
 --orange-danger: #EF4444   /* ≥90% */
---blue:     #3B82F6   /* semanal */
+--blue:          #3B82F6   /* weekly limit */
+--green:         #4ADE80   /* LIVE badge active */
 ```
 
-## Decisiones técnicas
+## Technical Decisions
 
-**Sin popup** — `chrome.action.onClicked` abre `dashboard.html` como nueva pestaña. Más espacio, sin limitaciones de popup MV3.
+**No default popup** — `chrome.action.onClicked` opens `dashboard.html` as a centered floating window (`chrome.windows.create({ type: "popup" })`). More space, no MV3 popup height limits.
 
-**JS externo obligatorio** — MV3 Content Security Policy bloquea `<script>` inline en páginas de extensión. Todo el JS del dashboard está en `dashboard.js`.
+**External JS required** — MV3 Content Security Policy blocks inline `<script>` in extension pages. All dashboard/options logic lives in external `.js` files.
 
-**Background fetch** — el service worker puede hacer `fetch` con `credentials: "include"` a URLs en `host_permissions`. Usa el cookie store de Chrome, sin necesidad de que el usuario provea credenciales.
+**Background fetch** — the service worker can call `fetch` with `credentials: "include"` to any URL declared in `host_permissions`. It uses Chrome's cookie store — no user credentials needed.
 
-**Storage como canal reactivo** — en vez de `sendMessage`/`sendResponse` (poco fiable cuando el service worker está dormido), se escribe a `chrome.storage.local` y el dashboard escucha con `onChanged`.
+**Storage as reactive channel** — instead of `sendMessage`/`sendResponse` (unreliable when the service worker is sleeping), data is written to `chrome.storage.local` and the dashboard listens via `onChanged`.
+
+**Update check** — every 1 minute, the service worker fetches the raw `manifest.json` from GitHub master and compares versions. On mismatch: badge `↑`, orange banner in dashboard.
