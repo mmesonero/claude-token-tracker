@@ -188,13 +188,24 @@ const REMOTE_MANIFEST =
   "https://raw.githubusercontent.com/mmesonero/claude-token-tracker/master/manifest.json";
 const UPDATE_INTERVAL_MS = 60_000; // 1 min
 
+function compareVersion(a, b) {
+  const A = String(a).split('.').map(n => parseInt(n, 10) || 0);
+  const B = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(A.length, B.length); i++) {
+    const x = A[i] || 0, y = B[i] || 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
 async function checkForUpdate() {
   try {
     const r = await fetch(`${REMOTE_MANIFEST}?_=${Date.now()}`); // cache-bust
     if (!r.ok) return;
     const remote = await r.json();
     const local  = chrome.runtime.getManifest().version;
-    const hasUpdate = remote.version !== local;
+    const hasUpdate = compareVersion(remote.version, local) > 0;
 
     await chrome.storage.local.set({
       updateAvailable:  hasUpdate,

@@ -1,8 +1,10 @@
 # Claude Token Tracker
 
-Chrome extension that displays real-time Claude usage limits directly on claude.ai — an inline widget below the chat box, and a floating dashboard window when you click the extension icon.
+Chrome extension that displays real-time Claude usage limits directly on claude.ai — an inline widget below the chat box, a floating dashboard popup when you click the extension icon, and a full-page **Metric Dashboard** for `ccusage`-based Claude Code analytics.
 
 ## What it shows
+
+### claude.ai popup (live limits)
 
 | Field | API source | Description |
 |---|---|---|
@@ -11,6 +13,12 @@ Chrome extension that displays real-time Claude usage limits directly on claude.
 | Reset time | `five_hour.resets_at` / `seven_day.resets_at` | Absolute day + time: "Wed 04:40" |
 
 Data comes from the real API: `/api/organizations/{orgId}/usage`. Org ID is read from the `lastActiveOrg` cookie.
+
+### Metric Dashboard (Claude Code analytics)
+
+Opened from the **Dashboard** button in the popup header. Renders a static snapshot of `ccusage` output: tokens/cost per day, model breakdown, agent breakdown, weekly aggregates, top projects, top sessions. Filters: range (7d/30d/custom), agent, project. All assets self-hosted — no CDN, no external font calls. Chart.js bundled under `lib/`.
+
+Data is read from `usage-data.js` (a static `window.__USAGE__ = {...}` blob produced by `ccusage` and pasted in). To refresh: re-run your `ccusage` export and replace `usage-data.js`.
 
 ## Install
 
@@ -24,7 +32,8 @@ Data comes from the real API: `/api/organizations/{orgId}/usage`. Org ID is read
 ## Usage
 
 - **Widget** — go to **claude.ai**, the bar appears automatically below the message input
-- **Dashboard** — click the extension icon in the Chrome toolbar → a floating window opens centered on the current browser window
+- **Live popup** — click the extension icon in the Chrome toolbar → floating window with 5h + weekly limits
+- **Metric Dashboard** — click the `Dashboard` button inside the popup header → full-page Claude Code usage charts (opens in a new tab)
 
 ## Auto-update
 
@@ -63,15 +72,20 @@ dashboard.js       Reads liveUsage from storage. Reacts instantly via onChanged.
 
 ```
 claude-token-tracker/
-├── manifest.json        MV3 manifest
-├── background.js        Service worker
-├── content.js           Widget + postMessage bridge + API polling
-├── page-inject.js       Fetch interceptor (page context)
-├── dashboard.html/js    Floating dashboard window
-├── options.html/css/js  Settings page
-├── make-icons.js        PNG icon generator (Node.js, no deps)
-├── icons/               icon16/48/128.png
-└── docs/                README, ARCHITECTURE, CONTEXT
+├── manifest.json         MV3 manifest
+├── background.js         Service worker
+├── content.js            Widget + postMessage bridge + API polling
+├── page-inject.js        Fetch interceptor (page context)
+├── dashboard.html/js     Floating live-limits popup (claude.ai)
+├── dashboard-open.js     Opens usage.html in a new tab when Dashboard button is clicked
+├── usage.html            Metric Dashboard page (Claude Code analytics)
+├── usage-app.js          Metric Dashboard render logic (Chart.js)
+├── usage-data.js         Static `window.__USAGE__` data (regenerate from ccusage)
+├── lib/                  Self-hosted Chart.js + datalabels plugin (MV3 CSP-safe)
+├── options.html/css/js   Settings page
+├── make-icons.js         PNG icon generator (Node.js, no deps)
+├── icons/                icon16/48/128.png
+└── docs/                 README, ARCHITECTURE, CONTEXT
 ```
 
 ## License

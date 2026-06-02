@@ -9,7 +9,14 @@ claude-token-tracker/
 ├── content.js             Runs on claude.ai — injects widget, calls API, bridges storage
 ├── page-inject.js         Runs in page context — wraps window.fetch (passive listener)
 ├── dashboard.html         Floating popup window opened on icon click — dark UI, two cards
-├── dashboard.js           Dashboard logic — external file (MV3 CSP blocks inline scripts)
+├── dashboard.js           Popup logic — external file (MV3 CSP blocks inline scripts)
+├── dashboard-open.js      Click handler for the "Dashboard" button → tabs.create(usage.html)
+├── usage.html             Metric Dashboard — Claude Code analytics (ccusage snapshot)
+├── usage-app.js           Metric Dashboard render code (filters, charts, tables)
+├── usage-data.js          Static `window.__USAGE__` blob — regenerate from `ccusage`
+├── lib/
+│   ├── chart.umd.min.js              Chart.js v4.4.6 (self-hosted, MV3 CSP-safe)
+│   └── chartjs-plugin-datalabels.js  v2.2.0 (self-hosted)
 ├── options.html/css/js    Settings page — limit presets, data export/reset
 ├── make-icons.js          Node.js — generates PNGs without external dependencies
 ├── icons/
@@ -133,4 +140,27 @@ claude-token-tracker/
 
 **Storage as reactive channel** — instead of `sendMessage`/`sendResponse` (unreliable when the service worker is sleeping), data is written to `chrome.storage.local` and the dashboard listens via `onChanged`.
 
-**Update check** — every 1 minute, the service worker fetches the raw `manifest.json` from GitHub master and compares versions. On mismatch: badge `↑`, orange banner in dashboard.
+**Update check** — every 1 minute, the service worker fetches the raw `manifest.json` from GitHub master and compares versions (numeric semver compare, not string equality — older local versions correctly trigger the update banner, equal/newer don't). On mismatch: badge `↑`, orange banner in dashboard.
+
+## Metric Dashboard (Claude Code usage)
+
+Separate full-page view (`usage.html`) launched from a small **Dashboard** button anchored to the right of the popup header. Independent from the live-limits flow — no API, no service worker round-trip.
+
+**Flow**
+
+```
+dashboard.html (popup)
+   └── Dashboard button
+         └── dashboard-open.js → chrome.tabs.create({ url: chrome.runtime.getURL('usage.html') })
+               └── usage.html
+                     ├── lib/chart.umd.min.js          (self-hosted)
+                     ├── lib/chartjs-plugin-datalabels.js
+                     ├── usage-data.js                 → sets window.__USAGE__
+                     └── usage-app.js                  → reads __USAGE__, renders charts/tables
+```
+
+**Why self-hosted Chart.js** — MV3 default CSP is `script-src 'self'; object-src 'self'`. Remote scripts (CDN) and inline `<script>` blocks are both blocked. Everything must be a same-origin file.
+
+**Data refresh** — `usage-data.js` is a hand-regenerated snapshot from [`ccusage`](https://github.com/ryoppippi/ccusage). To update: re-run the ccusage export and overwrite `usage-data.js` with a new `window.__USAGE__ = {...};` assignment. The dashboard's `Generated <timestamp>` reads from `__USAGE__.generatedAt`.
+
+**View structure** — 3 summary cards (cost, tokens, cache), 6 chart panels (tokens/day, cost/day, model donut, agent donut, weekly tokens, weekly cost), 1 wide bar chart (top projects by cost), 2 tables (projects, top sessions). Filters: range (7/30/custom), agent, project.

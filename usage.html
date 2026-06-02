@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Claude Code Usage</title>
+  <link rel="icon" type="image/png" href="data:image/png;base64,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">
+  <script src="lib/chart.umd.min.js"></script>
+  <script src="lib/chartjs-plugin-datalabels.js"></script>
+  <style>
+    :root {
+      --bg: #262624;
+      --panel: #30302e;
+      --panel-2: #3a3a37;
+      --border: rgba(250, 249, 245, 0.08);
+      --border-strong: rgba(250, 249, 245, 0.14);
+      --text: #faf9f5;
+      --muted: #b9b9b3;
+      --muted-2: #8a8a83;
+      --accent: #d97757;
+      --accent-soft: rgba(217, 119, 87, 0.14);
+      --good: #6ee7b7;
+      --warn: #fbbf24;
+      --bad: #fb7185;
+      --serif: "Source Serif 4", "Source Serif Pro", "Tiempos Headline", Georgia, ui-serif, serif;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 14px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header { padding: 28px 36px 22px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; max-width: 1400px; margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark { width: 30px; height: 30px; flex-shrink: 0; display: block; }
+    .brand-mark img { width: 100%; height: 100%; display: block; }
+    header h1 { font-family: var(--serif); font-size: 24px; margin: 0; font-weight: 500; letter-spacing: -0.01em; }
+    header h1 .accent { color: var(--accent); font-style: italic; }
+    header .gen { color: var(--muted-2); font-size: 12px; margin-left: 4px; }
+    header .filter { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+    header .filter label { color: var(--muted); font-size: 13px; }
+    select, button {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font: 500 13px var(--sans);
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    .date-input {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 7px 10px;
+      font: 500 13px var(--sans);
+      color-scheme: dark;
+    }
+    select:hover, button:hover { background: var(--panel-2); border-color: rgba(250,249,245,0.22); }
+    button:active { transform: translateY(1px); }
+    select:focus, button:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    main { padding: 8px 36px 80px; max-width: 1400px; margin: 0 auto; }
+    .grid { display: grid; gap: 18px; }
+    .cards { grid-template-columns: repeat(4, 1fr); margin-bottom: 28px; }
+    .charts { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 1100px) {
+      .cards { grid-template-columns: repeat(2, 1fr); }
+      .charts { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      transition: border-color .15s;
+    }
+    .card:hover { border-color: var(--border-strong); }
+    .card .label { color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: 0.02em; }
+    .card .value { font-family: var(--serif); font-size: 30px; font-weight: 500; margin-top: 8px; letter-spacing: -0.02em; line-height: 1.1; }
+    .card .sub { color: var(--muted-2); font-size: 12px; margin-top: 6px; }
+    .card .sub .up { color: var(--bad); }
+    .card .sub .down { color: var(--good); }
+
+    .chart-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 26px 20px 18px;
+      min-width: 0;
+      overflow: visible;
+    }
+    @media (max-width: 520px) {
+      .chart-card { padding: 14px 14px 14px 8px; }
+      main { padding: 8px 12px 60px; }
+      header { padding: 20px 16px 16px; }
+    }
+    .chart-card h2 {
+      font-family: var(--serif);
+      font-size: 16px;
+      margin: 0 0 16px;
+      color: var(--text);
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+    .chart-wrap { position: relative; height: 280px; }
+    .chart-wrap.tall { height: 340px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr { transition: background .12s; }
+    tbody tr:hover { background: rgba(250,249,245,0.025); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(217,119,87,0.25); font-size: 11px; font-weight: 500; }
+    .pill.codex { background: rgba(110,231,183,0.12); color: var(--good); border-color: rgba(110,231,183,0.25); }
+
+    footer { text-align: center; color: var(--muted-2); font-size: 12px; padding: 28px 20px; }
+    footer code { background: var(--panel); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-mark"><img src="data:image/png;base64,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" alt="Claude Token Tracker"></div>
+      <h1>Claude Code <span class="accent">usage</span></h1>
+    </div>
+    <span class="gen" id="gen"></span>
+    <div class="filter">
+      <label for="range">Range</label>
+      <select id="range">
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="all" selected>All time</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <input type="date" id="from" class="date-input" hidden>
+      <input type="date" id="to" class="date-input" hidden>
+      <label for="agent">Agent</label>
+      <select id="agent"><option value="all">All</option></select>
+      <label for="project">Project</label>
+      <select id="project"><option value="all">All</option></select>
+      <button id="refresh" title="Re-run build.mjs in terminal to refresh">↻ Rebuild</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="grid cards" id="cards"></section>
+
+    <section class="grid charts">
+      <div class="chart-card"><h2>Tokens per day</h2><div class="chart-wrap tall"><canvas id="cTokens"></canvas></div></div>
+      <div class="chart-card"><h2>Cost per day (USD)</h2><div class="chart-wrap tall"><canvas id="cCost"></canvas></div></div>
+      <div class="chart-card"><h2>Model breakdown (cost)</h2><div class="chart-wrap"><canvas id="cModels"></canvas></div></div>
+      <div class="chart-card"><h2>Agent breakdown (tokens)</h2><div class="chart-wrap"><canvas id="cAgents"></canvas></div></div>
+      <div class="chart-card"><h2>Weekly tokens</h2><div class="chart-wrap"><canvas id="cWeekly"></canvas></div></div>
+      <div class="chart-card"><h2>Weekly cost</h2><div class="chart-wrap"><canvas id="cWeeklyCost"></canvas></div></div>
+      <div class="chart-card" style="grid-column: 1 / -1"><h2>Top projects by cost</h2><div class="chart-wrap tall"><canvas id="cProjects"></canvas></div></div>
+    </section>
+
+    <section class="chart-card" style="margin-top:18px">
+      <h2>Projects</h2>
+      <table>
+        <thead><tr><th>Project</th><th>Last activity</th><th>Agents</th><th class="num">Sessions</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
+        <tbody id="tblProjects"></tbody>
+      </table>
+    </section>
+
+    <section class="chart-card" style="margin-top:16px">
+      <h2>Top sessions by cost</h2>
+      <table>
+        <thead><tr><th>Last activity</th><th>Agent</th><th>Project</th><th>Models</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
+        <tbody id="tblSessions"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>Data via <code>ccusage</code>. Rebuild: <code>npm start</code> in this folder.</footer>
+
+  <script src="usage-data.js"></script>
+  <script src="usage-app.js"></script>
+</body>
+</html>
