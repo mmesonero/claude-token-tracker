@@ -146,19 +146,36 @@ async function fetchLiveUsage() {
 
 const DASH_W = 400;
 const DASH_H = 420;
-let dashWindowId = null;
+const DASH_URL_PATH = "dashboard.html";
+
+// Service workers in MV3 are killed when idle, so module-scoped variables
+// don't survive. Persist the popup-window id in session storage and also
+// fall back to a URL-based lookup so we never open duplicate popups.
+async function findDashWindow() {
+  const dashUrl = chrome.runtime.getURL(DASH_URL_PATH);
+  const { dashWindowId } = await chrome.storage.session.get("dashWindowId");
+  if (dashWindowId != null) {
+    try {
+      const w = await chrome.windows.get(dashWindowId);
+      if (w) return w.id;
+    } catch { /* window was closed */ }
+  }
+  // Fallback: scan all popup windows for one already pointing at dashboard.html
+  const wins = await chrome.windows.getAll({ populate: true, windowTypes: ["popup"] });
+  for (const w of wins) {
+    if (w.tabs?.some(t => t.url === dashUrl)) {
+      await chrome.storage.session.set({ dashWindowId: w.id });
+      return w.id;
+    }
+  }
+  return null;
+}
 
 chrome.action.onClicked.addListener(async () => {
-  const dashUrl = chrome.runtime.getURL("dashboard.html");
-
-  // If already open — just focus it
-  if (dashWindowId !== null) {
-    try {
-      await chrome.windows.update(dashWindowId, { focused: true });
-      return;
-    } catch {
-      dashWindowId = null; // window was closed externally
-    }
+  const existing = await findDashWindow();
+  if (existing != null) {
+    try { await chrome.windows.update(existing, { focused: true }); return; }
+    catch { /* fall through and recreate */ }
   }
 
   // Center relative to the current browser window
@@ -167,26 +184,27 @@ chrome.action.onClicked.addListener(async () => {
   const top  = Math.round(cur.top  + (cur.height - DASH_H) / 2);
 
   const win = await chrome.windows.create({
-    url:    dashUrl,
+    url:    chrome.runtime.getURL(DASH_URL_PATH),
     type:   "popup",
     width:  DASH_W,
     height: DASH_H,
     left,
     top,
   });
-  dashWindowId = win.id;
+  await chrome.storage.session.set({ dashWindowId: win.id });
 });
 
 // Clean up tracked ID when the window is closed
-chrome.windows.onRemoved.addListener((windowId) => {
-  if (windowId === dashWindowId) dashWindowId = null;
+chrome.windows.onRemoved.addListener(async (windowId) => {
+  const { dashWindowId } = await chrome.storage.session.get("dashWindowId");
+  if (windowId === dashWindowId) await chrome.storage.session.remove("dashWindowId");
 });
 
 // ─── Auto-update check ───────────────────────────────────────────────────────
 
 const REMOTE_MANIFEST =
   "https://raw.githubusercontent.com/mmesonero/claude-token-tracker/master/manifest.json";
-const UPDATE_INTERVAL_MS = 60_000; // 1 min
+const UPDATE_ALARM = "ctt-update-check";
 
 function compareVersion(a, b) {
   const A = String(a).split('.').map(n => parseInt(n, 10) || 0);
@@ -223,8 +241,19 @@ async function checkForUpdate() {
   }
 }
 
+// MV3 service workers don't survive idle, so setInterval is unreliable.
+// chrome.alarms wakes the worker on schedule.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 1 });
+});
+chrome.runtime.onStartup.addListener(() => {
+  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 1 });
+});
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === UPDATE_ALARM) checkForUpdate();
+});
+// Also run once at every worker wake-up
 checkForUpdate();
-setInterval(checkForUpdate, UPDATE_INTERVAL_MS);
 
 // ─── Message Listener ─────────────────────────────────────────────────────────
 

@@ -37,6 +37,7 @@ const shortProj = p => {
 };
 for (const p of (D.projects || [])) {
   if (p.project === '(unknown)') continue;
+  if ((p.totalCost || 0) < 5) continue;
   selProject.add(new Option(`${shortProj(p.project)} · $${(p.totalCost||0).toFixed(0)}`, p.project));
 }
 
@@ -186,95 +187,114 @@ function render() {
   const prev7 = daily.slice(-14, -7).reduce((s,r) => s + (r.totalCost||0), 0);
   const wow = prev7 ? ((last7 - prev7) / prev7 * 100) : 0;
 
+  // ── Model aggregates ───────────────────────────────────────────────────────
+  const modelCost = new Map();
+  const modelTok  = new Map();
+  for (const r of daily) for (const m of (r.modelBreakdowns || [])) {
+    modelCost.set(m.modelName, (modelCost.get(m.modelName)||0) + (m.cost||0));
+    modelTok.set(m.modelName,  (modelTok.get(m.modelName)||0)  + (m.inputTokens||0) + (m.outputTokens||0) + (m.cacheCreationTokens||0) + (m.cacheReadTokens||0));
+  }
+  const mEntries = [...modelTok.entries()].sort((a,b) => b[1] - a[1]);
+
+  // Cache efficiency (needed early for cards row)
+  const cacheInputSide = totCacheR + totCacheC + totIn;
+  const cacheEff = cacheInputSide > 0 ? (totCacheR / cacheInputSide) * 100 : 0;
+  const cacheEffColor = cacheEff >= 70 ? 'good' : cacheEff >= 40 ? 'warn' : 'bad';
+
+  // Cost/1K output — computed early for cards row
+  const costPer1kOutEarly = totOut > 0 ? (totCost / totOut) * 1000 : 0;
+  const API_OUT_PER_MTOK_EARLY = { 'claude-opus-4-8':25,'claude-opus-4-7':25,'claude-opus-4-6':25,'claude-sonnet-4-6':15,'claude-sonnet-4-5':15,'claude-haiku-4-5-20251001':5,'claude-haiku-4-5':5 };
+  let apiOutCostEarly = 0;
+  for (const r of daily) for (const m of (r.modelBreakdowns || [])) {
+    apiOutCostEarly += (m.outputTokens||0) / 1e6 * (API_OUT_PER_MTOK_EARLY[m.modelName] ?? 15);
+  }
+  const apiOutPer1kEarly = totOut > 0 ? (apiOutCostEarly / totOut) * 1000 : 0;
+  const overheadMultEarly = apiOutPer1kEarly > 0 ? costPer1kOutEarly / apiOutPer1kEarly : 1;
+  const costEffColorEarly = overheadMultEarly < 5 ? 'good' : overheadMultEarly < 10 ? 'warn' : 'bad';
+
   const cards = [
-    { label: 'Total cost', value: fmtUsd(totCost), sub: `${days} days · avg ${fmtUsd(avgDay)}/day` },
-    { label: 'Total tokens', value: fmtTok(totTok), sub: `in ${fmtTok(totIn)} · out ${fmtTok(totOut)}` },
-    { label: 'Cache read', value: fmtTok(totCacheR), sub: `creation ${fmtTok(totCacheC)}` },
-    { label: 'Last 7 days', value: fmtUsd(last7), sub: (prev7 ? `<span class="${wow >= 0 ? 'up' : 'down'}">${wow >= 0 ? '▲' : '▼'} ${Math.abs(wow).toFixed(0)}%</span> vs prev 7` : 'no prev period') },
+    { label: 'Total tokens',     value: fmtTok(totTok),   sub: `in ${fmtTok(totIn)} · out ${fmtTok(totOut)}` },
+    { label: 'Total cost',       value: fmtUsd(totCost),  sub: `${days} days · avg ${fmtUsd(avgDay)}/day` },
+    { label: 'Cache efficiency', value: `<span class="metric-${cacheEffColor}">${cacheEff.toFixed(0)}%</span>`, sub: `≥70% <span style="color:var(--good)">●</span> ≥40% <span style="color:var(--warn)">●</span> &lt;40% <span style="color:var(--bad)">●</span>` },
+    { label: 'Cost / 1K output', value: `<span class="metric-${costEffColorEarly}">${fmtUsd(costPer1kOutEarly)}</span>`, sub: `API output rate ${fmtUsd(apiOutPer1kEarly)}/1K &nbsp;·&nbsp; ${overheadMultEarly.toFixed(1)}× overhead` },
   ];
   document.getElementById('cards').innerHTML = cards.map(c =>
     `<div class="card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`
   ).join('');
 
+
   const labels = daily.map(r => r.period);
 
+  const rollingTok = daily.map((_, i) => {
+    const slice = daily.slice(Math.max(0, i - 6), i + 1);
+    const active = slice.filter(r => r.totalTokens > 0).length || 1;
+    return slice.reduce((s, r) => s + (r.totalTokens || 0), 0) / active;
+  });
   charts.tokens = new Chart(document.getElementById('cTokens'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Input',          data: daily.map(r => r.inputTokens||0),          backgroundColor: palette[2], stack: 't' },
-        { label: 'Output',         data: daily.map(r => r.outputTokens||0),         backgroundColor: palette[0], stack: 't' },
-        { label: 'Cache create',   data: daily.map(r => r.cacheCreationTokens||0),  backgroundColor: palette[3], stack: 't' },
-        { label: 'Cache read',     data: daily.map(r => r.cacheReadTokens||0),      backgroundColor: palette[1], stack: 't' },
-      ],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtInt(c.parsed.y)}` } } },
-      scales: { x: { stacked: true, grid: { color: gridColor } }, y: { stacked: true, grid: { color: gridColor }, ticks: { callback: v => fmtTok(v) } } },
-    },
-  });
-
-  charts.cost = new Chart(document.getElementById('cCost'), {
     type: 'line',
-    data: { labels, datasets: [{ label: 'Cost', data: daily.map(r => r.totalCost||0), borderColor: palette[0], backgroundColor: palette[0]+'33', fill: true, tension: 0.25, pointRadius: 2 }] },
+    data: { labels, datasets: [
+      { label: 'Total tokens', data: daily.map(r => r.totalTokens||0), borderColor: palette[1], backgroundColor: palette[1]+'33', fill: true, tension: 0.25, pointRadius: 2 },
+      { label: '7d rolling avg', data: rollingTok, borderColor: '#84cc16', backgroundColor: 'transparent', fill: false, tension: 0.4, pointRadius: 0, borderDash: [5, 3], borderWidth: 1.5 },
+    ]},
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtUsd(c.parsed.y) } } },
-      scales: { x: { grid: { color: gridColor } }, y: { grid: { color: gridColor }, ticks: { callback: v => '$'+v.toFixed(2) } } },
+      plugins: { legend: { display: true, position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtTok(c.parsed.y) } } },
+      scales: { x: { grid: { color: gridColor } }, y: { grid: { color: gridColor }, ticks: { callback: v => fmtTok(v) } } },
     },
   });
 
-  const modelCost = new Map();
-  for (const r of daily) for (const m of (r.modelBreakdowns || [])) modelCost.set(m.modelName, (modelCost.get(m.modelName)||0) + (m.cost||0));
-  const mEntries = [...modelCost.entries()].sort((a,b) => b[1] - a[1]);
+
+  // Nested doughnut: outer = brand, inner = individual models
+  const modelBrand = n => n.startsWith('claude') ? 'Claude' : n.startsWith('gpt') || n.startsWith('o1') || n.startsWith('o3') ? 'OpenAI' : 'Other';
+  const BRAND_COLOR = { Claude: '#d97757', OpenAI: '#6ee7b7', Other: '#94a3b8' };
+  const MODEL_SHADES = {
+    Claude: ['#d97757','#b8472e','#e8955a','#f0b080','#a83820','#f5c89a'],
+    OpenAI: ['#6ee7b7','#34d399','#10b981','#a7f3d0','#059669'],
+    Other:  ['#94a3b8','#64748b'],
+  };
+  const brandOrder = [];
+  const brandCostMap = new Map();
+  for (const [m, cost] of mEntries) {
+    const b = modelBrand(m);
+    if (!brandCostMap.has(b)) { brandOrder.push(b); brandCostMap.set(b, 0); }
+    brandCostMap.set(b, brandCostMap.get(b) + cost);
+  }
+  const outerLabels = brandOrder;
+  const outerData   = brandOrder.map(b => brandCostMap.get(b));
+  const outerColors = brandOrder.map(b => BRAND_COLOR[b] || BRAND_COLOR.Other);
+
+  const innerLabels = [], innerData = [], innerColors = [];
+  for (const brand of brandOrder) {
+    const models = mEntries.filter(([m]) => modelBrand(m) === brand);
+    const shades  = MODEL_SHADES[brand] || MODEL_SHADES.Other;
+    models.forEach(([m, cost], i) => {
+      innerLabels.push(m);
+      innerData.push(cost);
+      innerColors.push(shades[i % shades.length]);
+    });
+  }
+  const shortModel = n => n.replace(/^claude-/, '').replace(/-(\d{4,}).*$/, '');
+
   charts.models = new Chart(document.getElementById('cModels'), {
     type: 'doughnut',
-    data: { labels: mEntries.map(e => e[0]), datasets: [{ data: mEntries.map(e => e[1]), backgroundColor: palette, borderWidth: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, tooltip: { callbacks: { label: c => `${c.label}: ${fmtUsd(c.parsed)}` } }, datalabels: donutLabels() } },
+    data: { labels: mEntries.map(e => shortModel(e[0])), datasets: [{ data: mEntries.map(e => e[1]), backgroundColor: palette, borderWidth: 2, borderColor: '#262624' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { title: items => shortModel(items[0].label), label: c => ' ' + fmtTok(c.parsed) } },
+        datalabels: donutLabels(),
+      },
+    },
   });
 
-  const agentTok = new Map();
-  for (const r of D.daily) {
-    const ags = r.metadata?.agents || [r.agent];
-    for (const a of ags) agentTok.set(a, (agentTok.get(a)||0) + (r.totalTokens||0));
-  }
-  const aEntries = [...agentTok.entries()].sort((a,b) => b[1] - a[1]);
-  charts.agents = new Chart(document.getElementById('cAgents'), {
-    type: 'doughnut',
-    data: { labels: aEntries.map(e => e[0]), datasets: [{ data: aEntries.map(e => e[1]), backgroundColor: palette, borderWidth: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' }, tooltip: { callbacks: { label: c => `${c.label}: ${fmtTok(c.parsed)}` } }, datalabels: donutLabels() } },
-  });
 
   const wkLabels = weekly.map(r => r.period);
-  charts.weekly = new Chart(document.getElementById('cWeekly'), {
-    type: 'bar',
-    data: { labels: wkLabels, datasets: [{ label: 'Tokens', data: weekly.map(r => r.totalTokens||0), backgroundColor: palette[1] }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtInt(c.parsed.y) } } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { color: gridColor }, ticks: { callback: v => fmtTok(v) } } } },
-  });
-  charts.weeklyCost = new Chart(document.getElementById('cWeeklyCost'), {
-    type: 'bar',
-    data: { labels: wkLabels, datasets: [{ label: 'Cost', data: weekly.map(r => r.totalCost||0), backgroundColor: palette[0] }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtUsd(c.parsed.y) } } }, scales: { x: { grid: { color: gridColor } }, y: { grid: { color: gridColor }, ticks: { callback: v => '$'+v.toFixed(0) } } } },
-  });
 
   const shortProjHtml = p => p
     ? p.split(/[\\/]/).filter(Boolean).slice(-2).join('/')
     : '<span style="color:var(--muted-2)">—</span>';
 
-  const topSessions = [...sessionsAll]
-    .sort((a, b) => (b.totalCost || 0) - (a.totalCost || 0))
-    .slice(0, 20);
-  document.getElementById('tblSessions').innerHTML = topSessions.map(s => `
-    <tr>
-      <td>${s.metadata?.lastActivity || '—'}</td>
-      <td><span class="pill ${s.agent}">${s.agent}</span></td>
-      <td title="${s.projectPath || ''}">${shortProjHtml(s.projectPath)}</td>
-      <td>${(s.modelsUsed || []).join(', ')}</td>
-      <td class="num">${fmtTok(s.totalTokens)}</td>
-      <td class="num">${fmtUsd(s.totalCost)}</td>
-    </tr>`).join('');
 
   const projMap = new Map();
   for (const s of sessionsAll) {
@@ -292,7 +312,7 @@ function render() {
   const projects = [...projMap.values()]
     .map(p => ({ ...p, agents: [...p.agents], models: [...p.models] }))
     .sort((a, b) => b.totalCost - a.totalCost);
-  const topN = projects.slice(0, 15);
+  const topN = projects.filter(p => p.totalCost >= 5).slice(0, 15);
 
   charts.projects = new Chart(document.getElementById('cProjects'), {
     type: 'bar',
@@ -308,7 +328,7 @@ function render() {
     },
   });
 
-  document.getElementById('tblProjects').innerHTML = projects.slice(0, 30).map(p => `
+  document.getElementById('tblProjects').innerHTML = projects.filter(p => p.totalCost >= 5).slice(0, 30).map(p => `
     <tr>
       <td title="${p.project}">${shortProjHtml(p.project)}</td>
       <td>${p.lastActivity || '—'}</td>
@@ -333,7 +353,11 @@ selRange.addEventListener('change', () => {
 });
 inpFrom.addEventListener('change', render);
 inpTo.addEventListener('change', render);
-document.getElementById('refresh').addEventListener('click', () => {
-  alert('Run "npm start" (or "npm run build") in claude-code-usage to refresh data.');
+
+document.getElementById('toggleProjects').addEventListener('click', function () {
+  const detail = document.getElementById('projectsDetail');
+  const open = detail.style.display !== 'none';
+  detail.style.display = open ? 'none' : 'block';
+  this.textContent = open ? '▼ All projects' : '▲ Hide';
 });
 render();

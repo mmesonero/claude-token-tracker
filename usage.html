@@ -88,6 +88,9 @@
     .card .sub { color: var(--muted-2); font-size: 12px; margin-top: 6px; }
     .card .sub .up { color: var(--bad); }
     .card .sub .down { color: var(--good); }
+    .metric-good { color: var(--good); }
+    .metric-warn { color: var(--warn); }
+    .metric-bad  { color: var(--bad); }
 
     .chart-card {
       background: var(--panel);
@@ -149,7 +152,6 @@
       <select id="agent"><option value="all">All</option></select>
       <label for="project">Project</label>
       <select id="project"><option value="all">All</option></select>
-      <button id="refresh" title="Re-run build.mjs in terminal to refresh">↻ Rebuild</button>
     </div>
   </header>
 
@@ -158,32 +160,29 @@
 
     <section class="grid charts">
       <div class="chart-card"><h2>Tokens per day</h2><div class="chart-wrap tall"><canvas id="cTokens"></canvas></div></div>
-      <div class="chart-card"><h2>Cost per day (USD)</h2><div class="chart-wrap tall"><canvas id="cCost"></canvas></div></div>
-      <div class="chart-card"><h2>Model breakdown (cost)</h2><div class="chart-wrap"><canvas id="cModels"></canvas></div></div>
-      <div class="chart-card"><h2>Agent breakdown (tokens)</h2><div class="chart-wrap"><canvas id="cAgents"></canvas></div></div>
-      <div class="chart-card"><h2>Weekly tokens</h2><div class="chart-wrap"><canvas id="cWeekly"></canvas></div></div>
-      <div class="chart-card"><h2>Weekly cost</h2><div class="chart-wrap"><canvas id="cWeeklyCost"></canvas></div></div>
-      <div class="chart-card" style="grid-column: 1 / -1"><h2>Top projects by cost</h2><div class="chart-wrap tall"><canvas id="cProjects"></canvas></div></div>
+      <div class="chart-card"><h2>Model breakdown (tokens)</h2><div class="chart-wrap"><canvas id="cModels"></canvas></div></div>
+      <div class="chart-card" style="grid-column: 1 / -1">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h2 style="margin:0">Top projects by cost</h2>
+          <button id="toggleProjects" style="font-size:11px;padding:5px 12px;border-radius:8px">▼ All projects</button>
+        </div>
+        <div class="chart-wrap tall"><canvas id="cProjects"></canvas></div>
+        <div id="projectsDetail" style="display:none;margin-top:18px">
+          <table>
+            <thead><tr><th>Project</th><th>Last activity</th><th>Agents</th><th class="num">Sessions</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
+            <tbody id="tblProjects"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
-    <section class="chart-card" style="margin-top:18px">
-      <h2>Projects</h2>
-      <table>
-        <thead><tr><th>Project</th><th>Last activity</th><th>Agents</th><th class="num">Sessions</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
-        <tbody id="tblProjects"></tbody>
-      </table>
-    </section>
-
-    <section class="chart-card" style="margin-top:16px">
-      <h2>Top sessions by cost</h2>
-      <table>
-        <thead><tr><th>Last activity</th><th>Agent</th><th>Project</th><th>Models</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
-        <tbody id="tblSessions"></tbody>
-      </table>
-    </section>
   </main>
 
-  <footer>Data via <code>ccusage</code>. Rebuild: <code>npm start</code> in this folder.</footer>
+  <footer>
+    <a href="https://github.com/mmesonero" target="_blank" style="color:var(--muted);text-decoration:none;transition:color .2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">GitHub</a>
+    <span style="margin:0 8px;opacity:.3">·</span>
+    <a href="https://www.linkedin.com/in/mesonero/" target="_blank" style="color:var(--muted);text-decoration:none;transition:color .2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">LinkedIn</a>
+  </footer>
 
   <script src="usage-data.js"></script>
   <script src="usage-app.js"></script>
