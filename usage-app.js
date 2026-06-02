@@ -193,16 +193,27 @@ function render() {
   }
   const mEntries = [...modelTok.entries()].sort((a,b) => b[1] - a[1]);
 
+  // Cache efficiency (needed early for cards row)
   const cacheInputSide = totCacheR + totCacheC + totIn;
   const cacheEff = cacheInputSide > 0 ? (totCacheR / cacheInputSide) * 100 : 0;
   const cacheEffColor = cacheEff >= 70 ? 'good' : cacheEff >= 40 ? 'warn' : 'bad';
 
+  // Cost/1K output — computed early for cards row
+  const costPer1kOutEarly = totOut > 0 ? (totCost / totOut) * 1000 : 0;
+  const API_OUT_PER_MTOK_EARLY = { 'claude-opus-4-8':25,'claude-opus-4-7':25,'claude-opus-4-6':25,'claude-sonnet-4-6':15,'claude-sonnet-4-5':15,'claude-haiku-4-5-20251001':5,'claude-haiku-4-5':5 };
+  let apiOutCostEarly = 0;
+  for (const r of daily) for (const m of (r.modelBreakdowns || [])) {
+    apiOutCostEarly += (m.outputTokens||0) / 1e6 * (API_OUT_PER_MTOK_EARLY[m.modelName] ?? 15);
+  }
+  const apiOutPer1kEarly = totOut > 0 ? (apiOutCostEarly / totOut) * 1000 : 0;
+  const overheadMultEarly = apiOutPer1kEarly > 0 ? costPer1kOutEarly / apiOutPer1kEarly : 1;
+  const costEffColorEarly = overheadMultEarly < 5 ? 'good' : overheadMultEarly < 10 ? 'warn' : 'bad';
 
   const cards = [
     { label: 'Total tokens',     value: fmtTok(totTok),   sub: (() => { const r = avgDay / 6; const p = r > 67 ? 0.1 : r > 33 ? 0.5 : r > 10 ? 1 : r > 5 ? 3 : r > 2 ? 10 : 25; return `<span style="color:var(--good)">${p}%</span> globally`; })() },
     { label: 'Total cost',       value: fmtUsd(totCost),  sub: `Avg ${fmtUsd(avgDay)}/day` },
     { label: 'Cache efficiency', value: `<span class="metric-${cacheEffColor}">${cacheEff.toFixed(0)}%</span>`, sub: `≥70% <span style="color:var(--good)">●</span> ≥40% <span style="color:var(--warn)">●</span> &lt;40% <span style="color:var(--bad)">●</span>` },
-    (() => { const r = totCacheC > 0 ? totCacheR / totCacheC : 0; const color = r >= 15 ? 'good' : r >= 8 ? 'warn' : 'bad'; return { label: 'Cache reuse rate', value: `<span class="metric-${color}">${r.toFixed(0)}×</span>`, sub: `industry avg 8-12× &nbsp;·&nbsp; ≥15× <span style="color:var(--good)">●</span> ≥8× <span style="color:var(--warn)">●</span>` }; })(),
+    { label: 'Cost / 1K output', value: `<span class="metric-${costEffColorEarly}">${fmtUsd(costPer1kOutEarly)}</span>`, sub: `API output rate ${fmtUsd(apiOutPer1kEarly)}/1K &nbsp;·&nbsp; ${overheadMultEarly.toFixed(1)}× overhead` },
   ];
   document.getElementById('cards').innerHTML = cards.map(c =>
     `<div class="card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`
@@ -283,7 +294,7 @@ function render() {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: { display: true, position: 'bottom', labels: { color: '#b9b9b3', font: { size: 11 }, padding: 10, usePointStyle: true, boxWidth: 8 } },
         tooltip: { callbacks: { title: items => shortModel(items[0].label), label: c => ' ' + fmtTok(c.parsed) } },
         datalabels: donutLabels(),
       },
