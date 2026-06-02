@@ -191,17 +191,6 @@ function render() {
   const cacheEff = cacheInputSide > 0 ? (totCacheR / cacheInputSide) * 100 : 0;
   const cacheEffColor = cacheEff >= 70 ? 'good' : cacheEff >= 40 ? 'warn' : 'bad';
 
-  // Cost/1K output — computed early for cards row
-  const costPer1kOutEarly = totOut > 0 ? (totCost / totOut) * 1000 : 0;
-  const API_OUT_PER_MTOK_EARLY = { 'claude-opus-4-8':25,'claude-opus-4-7':25,'claude-opus-4-6':25,'claude-sonnet-4-6':15,'claude-sonnet-4-5':15,'claude-haiku-4-5-20251001':5,'claude-haiku-4-5':5 };
-  let apiOutCostEarly = 0;
-  for (const r of daily) for (const m of (r.modelBreakdowns || [])) {
-    apiOutCostEarly += (m.outputTokens||0) / 1e6 * (API_OUT_PER_MTOK_EARLY[m.modelName] ?? 15);
-  }
-  const apiOutPer1kEarly = totOut > 0 ? (apiOutCostEarly / totOut) * 1000 : 0;
-  const overheadMultEarly = apiOutPer1kEarly > 0 ? costPer1kOutEarly / apiOutPer1kEarly : 1;
-  const costEffColorEarly = overheadMultEarly < 5 ? 'good' : overheadMultEarly < 10 ? 'warn' : 'bad';
-
   const cards = [
     { label: 'Total tokens',     value: fmtTok(totTok),   sub: (() => { const r = avgDay / 6; const p = r > 67 ? 0.1 : r > 33 ? 0.5 : r > 10 ? 1 : r > 5 ? 3 : r > 2 ? 10 : 25; return `<span style="color:var(--good)">${p}%</span> globally`; })() },
     { label: 'Total cost',       value: fmtUsd(totCost),  sub: `Avg ${fmtUsd(avgDay)}/day` },

@@ -132,6 +132,9 @@
 
     footer { text-align: center; color: var(--muted-2); font-size: 12px; padding: 24px 20px 20px; }
     footer code { background: var(--panel); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; }
+    .footer-link { color: var(--muted); text-decoration: none; transition: color .2s; }
+    .footer-link:hover { color: var(--text); }
+    .footer-sep { margin: 0 8px; opacity: .3; }
   </style>
 </head>
 <body>
@@ -183,9 +186,9 @@
   </main>
 
   <footer>
-    <a href="https://github.com/mmesonero" target="_blank" style="color:var(--muted);text-decoration:none;transition:color .2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">GitHub</a>
-    <span style="margin:0 8px;opacity:.3">·</span>
-    <a href="https://www.linkedin.com/in/mesonero/" target="_blank" style="color:var(--muted);text-decoration:none;transition:color .2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">LinkedIn</a>
+    <a class="footer-link" href="https://github.com/mmesonero" target="_blank" rel="noopener">GitHub</a>
+    <span class="footer-sep">·</span>
+    <a class="footer-link" href="https://www.linkedin.com/in/mesonero/" target="_blank" rel="noopener">LinkedIn</a>
   </footer>
 
   <script src="usage-data.js"></script>
