@@ -4,8 +4,8 @@
 
 ```
 claude-token-tracker/
-├── manifest.json          MV3 manifest — permissions, content scripts, action (v1.3.3)
-├── background.js          Service worker — opens dashboard window, fetches API, message bus, update check
+├── manifest.json          MV3 manifest — permissions, content scripts, action (v1.4.0)
+├── background.js          Service worker — opens dashboard window, fetches API, message bus
 ├── content.js             Runs on claude.ai — injects widget, calls API, bridges storage
 ├── page-inject.js         Runs in page context — wraps window.fetch (passive listener)
 ├── dashboard.html         Floating popup window opened on icon click — dark UI, two cards
@@ -88,11 +88,7 @@ claude-token-tracker/
     // up to 30 days rolling
   },
   limits: { daily: 1000000, weekly: 7000000 },
-  lastUpdated: 1748210400000,
-
-  // Update check:
-  updateAvailable: false,
-  remoteVersion: "1.3.3"
+  lastUpdated: 1748210400000
 }
 
 // chrome.storage.session keys:
@@ -112,7 +108,6 @@ claude-token-tracker/
 | options → background | `SET_LIMITS` | `{daily, weekly}` | `{ok: true}` |
 | options → background | `EXPORT_DATA` | — | full usage object |
 | options → background | `RESET_DATA` | — | `{ok: true}` |
-| dashboard → background | `RELOAD` | — | `{ok: true}` then `chrome.runtime.reload()` |
 
 ## Design Tokens
 
@@ -145,7 +140,7 @@ claude-token-tracker/
 
 **Storage as reactive channel** — instead of `sendMessage`/`sendResponse` (unreliable when the service worker is sleeping), data is written to `chrome.storage.local` and the dashboard listens via `onChanged`. The `onChanged` handler also refreshes `localStats` before re-rendering to avoid stale token counts in expanded cards.
 
-**Update check** — every 12 hours via `chrome.alarms` (not `setInterval` — alarms survive service worker idle restarts). The alarm is created with `chrome.alarms.get` guard to prevent duplicates. Compares versions numerically (not string equality) so older local versions correctly trigger the update banner.
+**No auto-update** — the extension never pings GitHub. Updates are a manual `git pull` + reload at `chrome://extensions`. The prior auto-update path (alarms, banner, badge) was removed in v1.4.0.
 
 **web_accessible_resources** — only `page-inject.js` and `icons/*.png` are exposed (to `https://claude.ai/*`). Internal pages like `usage.html` are opened via `chrome.tabs.create` from the extension's own context, which doesn't require WAR.
 

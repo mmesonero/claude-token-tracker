@@ -206,67 +206,13 @@ chrome.windows.onRemoved.addListener(async (windowId) => {
   if (windowId === dashWindowId) await chrome.storage.session.remove("dashWindowId");
 });
 
-// ─── Auto-update check ───────────────────────────────────────────────────────
-
-const REMOTE_MANIFEST =
-  "https://raw.githubusercontent.com/mmesonero/claude-token-tracker/master/manifest.json";
-const UPDATE_ALARM = "ctt-update-check";
-
-function compareVersion(a, b) {
-  const A = String(a).split('.').map(n => parseInt(n, 10) || 0);
-  const B = String(b).split('.').map(n => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(A.length, B.length); i++) {
-    const x = A[i] || 0, y = B[i] || 0;
-    if (x > y) return 1;
-    if (x < y) return -1;
-  }
-  return 0;
-}
-
-// Debounced — only one real network call per 6 h, regardless of how many
-// times the worker wakes (alarm, action click, message, etc.). Prevents
-// hitting raw.githubusercontent.com's anonymous rate limit (60/h per IP).
-const UPDATE_DEBOUNCE_MS = 6 * 3600_000;
-
-async function checkForUpdate({ force = false } = {}) {
+// ─── One-time cleanup: clear any state left over from the removed
+//                       auto-update feature (pre-1.4.0).
+chrome.runtime.onInstalled.addListener(async () => {
   try {
-    if (!force) {
-      const { lastUpdateCheck = 0 } = await chrome.storage.local.get("lastUpdateCheck");
-      if (Date.now() - lastUpdateCheck < UPDATE_DEBOUNCE_MS) return;
-    }
-    const r = await fetch(`${REMOTE_MANIFEST}?_=${Date.now()}`); // cache-bust
-    if (!r.ok) return;
-    const remote = await r.json();
-    const local  = chrome.runtime.getManifest().version;
-    const hasUpdate = compareVersion(remote.version, local) > 0;
-
-    await chrome.storage.local.set({
-      updateAvailable:  hasUpdate,
-      remoteVersion:    remote.version,
-      lastUpdateCheck:  Date.now(),
-    });
-
-    if (hasUpdate) {
-      chrome.action.setBadgeText({ text: "↑" });
-      chrome.action.setBadgeBackgroundColor({ color: "#D4670F" });
-    } else {
-      chrome.action.setBadgeText({ text: "" });
-    }
-  } catch {
-    // Network unavailable — silently skip
-  }
-}
-
-// MV3 service workers don't survive idle, so setInterval is unreliable.
-// chrome.alarms wakes the worker on schedule.
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.get(UPDATE_ALARM, a => { if (!a) chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 720 }); });
-});
-chrome.runtime.onStartup.addListener(() => {
-  chrome.alarms.get(UPDATE_ALARM, a => { if (!a) chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 720 }); });
-});
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === UPDATE_ALARM) checkForUpdate({ force: true });
+    await chrome.storage.local.remove(["updateAvailable", "remoteVersion", "lastUpdateCheck"]);
+    chrome.action.setBadgeText({ text: "" });
+  } catch {}
 });
 
 // ─── Message Listener ─────────────────────────────────────────────────────────
@@ -302,11 +248,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       // Fire and forget — result goes to storage, dashboard listens via onChanged
       fetchLiveUsage().catch(() => {});
       sendResponse({ ok: true });
-      return true;
-
-    case "RELOAD":
-      sendResponse({ ok: true });
-      chrome.runtime.reload();
       return true;
   }
 });

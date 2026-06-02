@@ -74,8 +74,8 @@ This powers the **options page** stats (all-time total, days with data, export).
 | Week start | Monday | ISO standard |
 | Token limits | User-configurable, sane defaults | No public API for plan limits |
 | Dashboard | Floating popup window via `chrome.windows.create` | Better real estate than a browser tab; stays on top |
-| Update alarm | `chrome.alarms` at 720 min | Survives SW idle restarts; `setInterval` is unreliable in MV3 |
-| web_accessible_resources | Restricted to `chrome-extension://*/*` | Prevents external pages from reading usage-data.js (contains private session data) |
+| Auto-update | Removed (v1.4.0) | Banner was noisy; manual `git pull` + reload preferred |
+| web_accessible_resources | Only `page-inject.js` + `icons/*` on `claude.ai/*` | Internal pages opened via `tabs.create` don't need WAR |
 
 ## Two-Repo Design
 

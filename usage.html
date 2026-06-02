@@ -174,14 +174,18 @@
           <button id="toggleProjects" style="font-size:11px;padding:5px 12px;border-radius:8px">▼ All projects</button>
         </div>
         <div class="chart-wrap tall"><canvas id="cProjects"></canvas></div>
-        <div id="projectsDetail" style="display:none;margin-top:18px">
-          <table>
-            <thead><tr><th>Project</th><th>Last activity</th><th>Agents</th><th class="num">Sessions</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
-            <tbody id="tblProjects"></tbody>
-          </table>
-        </div>
       </div>
     </section>
+
+    <div id="projectsDetail" style="display:none;margin-top:20px">
+      <div class="chart-card">
+        <h2>All projects</h2>
+        <table>
+          <thead><tr><th>Project</th><th>Last activity</th><th>Agents</th><th class="num">Sessions</th><th class="num">Tokens</th><th class="num">Cost</th></tr></thead>
+          <tbody id="tblProjects"></tbody>
+        </table>
+      </div>
+    </div>
 
   </main>
 

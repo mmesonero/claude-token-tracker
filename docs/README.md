@@ -63,14 +63,12 @@ claude-code-usage/   (local, private — contains usage-data.js with real sessio
 
 Run `npm start` in `claude-code-usage` to refresh data. The extension does **not** need to be reloaded — `usage-data.js` is read fresh on each Dashboard tab open.
 
-## Auto-update
+## Updating
 
-The extension checks for updates every 12 hours by comparing its local `manifest.json` version against the one on GitHub. If a newer version is found:
+There is no auto-update check — the extension never pings GitHub. To pull a new version manually:
 
-- The toolbar icon shows an **↑** badge
-- The dashboard shows an orange banner with a **Reload** button
-
-To update: `git pull` in the project folder, then click **Reload** (or go to `chrome://extensions` and reload manually).
+1. `git pull` in the project folder
+2. Open `chrome://extensions` and click the reload icon on Claude Token Tracker
 
 ## Compatibility
 
@@ -90,7 +88,6 @@ content.js         Receives token counts, forwards to background.
        ↓ chrome.runtime.sendMessage
 background.js      Service worker. Opens dashboard window on icon click.
                    Fetches live usage via Chrome cookie store (REFRESH_USAGE).
-                   Checks GitHub for updates every 12 h via chrome.alarms.
        ↓ chrome.storage.local
 dashboard.js       Reads liveUsage from storage. Reacts instantly via onChanged.
                    Requests refresh every 60 s as fallback.
@@ -100,7 +97,7 @@ dashboard.js       Reads liveUsage from storage. Reacts instantly via onChanged.
 
 ```
 claude-token-tracker/
-├── manifest.json         MV3 manifest (v1.3.3)
+├── manifest.json         MV3 manifest (v1.4.0)
 ├── background.js         Service worker
 ├── content.js            Widget + postMessage bridge + API polling
 ├── page-inject.js        Fetch interceptor (page context)

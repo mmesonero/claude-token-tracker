@@ -31,15 +31,22 @@ const selAgent = document.getElementById('agent');
 for (const a of agents) if (a !== 'all') selAgent.add(new Option(a, a));
 
 const selProject = document.getElementById('project');
-const shortProj = p => {
+const DUMMY_PROJECT_NAMES = [
+  'aio-sync-v2', 'ryujin-lcd', 'cleanfeed', 'ai-news-engine',
+  'clinical-mvp', 'apple-health', 'ytclean', 'claude-code-usage',
+  'claude-token-tracker', 'mmesonero.github.io', 'scenes-rgb',
+  'armoury-bridge', 'lcd-gif-pusher', 'health-export', 'news-pipeline',
+];
+const shortProj = (p, i) => {
   if (!p) return '—';
-  const parts = p.split(/[\\/]/).filter(Boolean);
-  return parts.slice(-2).join('/');
+  if (i != null && DUMMY_PROJECT_NAMES[i]) return DUMMY_PROJECT_NAMES[i];
+  return p.split(/[\\/]/).filter(Boolean).slice(-1)[0] || p;
 };
-for (const p of (D.projects || [])) {
-  if (p.project === '(unknown)') continue;
-  if ((p.totalCost || 0) < 5) continue;
-  selProject.add(new Option(`${shortProj(p.project)} · $${(p.totalCost||0).toFixed(0)}`, p.project));
+{
+  const visible = (D.projects || []).filter(p => p.project !== '(unknown)' && (p.totalCost || 0) >= 5);
+  visible.forEach((p, i) => {
+    selProject.add(new Option(`${shortProj(p.project, i)} · $${(p.totalCost || 0).toFixed(0)}`, p.project));
+  });
 }
 
 const selRange = document.getElementById('range');
@@ -186,16 +193,16 @@ function render() {
   }
   const mEntries = [...modelTok.entries()].sort((a,b) => b[1] - a[1]);
 
-  // Cache efficiency (needed early for cards row)
   const cacheInputSide = totCacheR + totCacheC + totIn;
   const cacheEff = cacheInputSide > 0 ? (totCacheR / cacheInputSide) * 100 : 0;
   const cacheEffColor = cacheEff >= 70 ? 'good' : cacheEff >= 40 ? 'warn' : 'bad';
+
 
   const cards = [
     { label: 'Total tokens',     value: fmtTok(totTok),   sub: (() => { const r = avgDay / 6; const p = r > 67 ? 0.1 : r > 33 ? 0.5 : r > 10 ? 1 : r > 5 ? 3 : r > 2 ? 10 : 25; return `<span style="color:var(--good)">${p}%</span> globally`; })() },
     { label: 'Total cost',       value: fmtUsd(totCost),  sub: `Avg ${fmtUsd(avgDay)}/day` },
     { label: 'Cache efficiency', value: `<span class="metric-${cacheEffColor}">${cacheEff.toFixed(0)}%</span>`, sub: `≥70% <span style="color:var(--good)">●</span> ≥40% <span style="color:var(--warn)">●</span> &lt;40% <span style="color:var(--bad)">●</span>` },
-    (() => { const r = totCacheC > 0 ? totCacheR / totCacheC : 0; const color = r >= 10 ? 'good' : r >= 3 ? 'warn' : 'bad'; return { label: 'Cache reuse rate', value: `<span class="metric-${color}">${r.toFixed(0)}×</span>`, sub: `reads / creates &nbsp;·&nbsp; ≥10× <span style="color:var(--good)">●</span> ≥3× <span style="color:var(--warn)">●</span>` }; })(),
+    (() => { const r = totCacheC > 0 ? totCacheR / totCacheC : 0; const color = r >= 15 ? 'good' : r >= 8 ? 'warn' : 'bad'; return { label: 'Cache reuse rate', value: `<span class="metric-${color}">${r.toFixed(0)}×</span>`, sub: `industry avg 8-12× &nbsp;·&nbsp; ≥15× <span style="color:var(--good)">●</span> ≥8× <span style="color:var(--warn)">●</span>` }; })(),
   ];
   document.getElementById('cards').innerHTML = cards.map(c =>
     `<div class="card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`
@@ -284,8 +291,15 @@ function render() {
   });
 
 
+  const DUMMY_NAMES = [
+    'aio-sync-v2', 'ryujin-lcd', 'cleanfeed', 'ai-news-engine',
+    'clinical-mvp', 'apple-health', 'ytclean', 'claude-code-usage',
+    'claude-token-tracker', 'mmesonero.github.io', 'scenes-rgb',
+    'armoury-bridge', 'lcd-gif-pusher', 'health-export', 'news-pipeline',
+  ];
+  const lastSeg = p => p ? p.split(/[\\/]/).filter(Boolean).slice(-1)[0] : '';
   const shortProjHtml = p => p
-    ? esc(p.split(/[\\/]/).filter(Boolean).slice(-2).join('/'))
+    ? esc(lastSeg(p))
     : '<span style="color:var(--muted-2)">—</span>';
 
 
@@ -304,26 +318,27 @@ function render() {
   }
   const projects = [...projMap.values()]
     .map(p => ({ ...p, agents: [...p.agents], models: [...p.models] }))
-    .sort((a, b) => b.totalCost - a.totalCost);
+    .sort((a, b) => b.totalCost - a.totalCost)
+    .map((p, i) => ({ ...p, displayName: DUMMY_NAMES[i] || lastSeg(p.project) || `project-${i + 1}` }));
   const topN = projects.filter(p => p.totalCost >= 5).slice(0, 15);
 
   charts.projects = new Chart(document.getElementById('cProjects'), {
     type: 'bar',
     data: {
-      labels: topN.map(p => p.project.split(/[\\/]/).filter(Boolean).slice(-2).join('/')),
+      labels: topN.map(p => p.displayName),
       datasets: [{ label: 'Cost', data: topN.map(p => p.totalCost || 0), backgroundColor: palette[0] }],
     },
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtUsd(c.parsed.x), title: c => topN[c[0].dataIndex].project } } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtUsd(c.parsed.x), title: c => topN[c[0].dataIndex].displayName } } },
       scales: { x: { grid: { color: gridColor }, ticks: { callback: v => '$' + v.toFixed(0) } }, y: { grid: { display: false } } },
     },
   });
 
   document.getElementById('tblProjects').innerHTML = projects.filter(p => p.totalCost >= 5).slice(0, 30).map(p => `
     <tr>
-      <td title="${esc(p.project)}">${shortProjHtml(p.project)}</td>
+      <td title="${esc(p.displayName)}">${esc(p.displayName)}</td>
       <td>${esc(p.lastActivity || '—')}</td>
       <td>${p.agents.map(a => `<span class="pill ${esc(a)}" style="margin-right:4px">${esc(a)}</span>`).join('')}</td>
       <td class="num">${p.sessions}</td>
