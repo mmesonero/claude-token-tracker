@@ -274,8 +274,9 @@ async function init() {
 
   requestRefresh();
 
-  chrome.storage.onChanged.addListener((changes, area) => {
+  chrome.storage.onChanged.addListener(async (changes, area) => {
     if (area === "local" && changes.liveUsage?.newValue) {
+      localStats = await fetchLocalStats();
       render(changes.liveUsage.newValue);
     }
   });

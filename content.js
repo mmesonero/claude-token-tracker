@@ -9,23 +9,26 @@
 })();
 
 // ── 2. Receive token counts from the injected script and forward to background ──
-window.addEventListener("message", (event) => {
-  if (event.source !== window) return;
-  if (!event.data || event.data.type !== "CLAUDE_TOKEN_USAGE") return;
-  try {
-    chrome.runtime.sendMessage(
-      {
-        type: "UPDATE_USAGE",
-        data: {
-          model:        event.data.model,
-          inputTokens:  event.data.inputTokens,
-          outputTokens: event.data.outputTokens,
+if (!window.__cttListenerAttached) {
+  window.__cttListenerAttached = true;
+  window.addEventListener("message", (event) => {
+    if (event.source !== window) return;
+    if (!event.data || event.data.type !== "CLAUDE_TOKEN_USAGE") return;
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "UPDATE_USAGE",
+          data: {
+            model:        event.data.model,
+            inputTokens:  event.data.inputTokens,
+            outputTokens: event.data.outputTokens,
+          },
         },
-      },
-      () => void chrome.runtime.lastError
-    );
-  } catch { /* extension context gone */ }
-}, false);
+        () => void chrome.runtime.lastError
+      );
+    } catch { /* extension context gone */ }
+  }, false);
+}
 
 (function () {
   "use strict";

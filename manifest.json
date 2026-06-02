@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Claude Token Tracker",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "Track Claude AI token usage — claude.ai tracker + Claude Code usage metrics dashboard.",
   "permissions": [
     "storage",
@@ -36,7 +36,7 @@
     },
     {
       "resources": ["usage.html", "usage-app.js", "usage-data.js", "lib/*.js"],
-      "matches": ["<all_urls>"]
+      "matches": ["chrome-extension://*/*"]
     }
   ],
   "icons": {

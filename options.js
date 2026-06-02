@@ -82,6 +82,7 @@ async function resetData() {
 
 // ── Wire up ───────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("extVersion").textContent = "v" + chrome.runtime.getManifest().version;
   loadAll();
 
   document.getElementById("saveLimits").addEventListener("click", saveLimits);

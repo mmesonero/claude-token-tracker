@@ -18,6 +18,7 @@ if (!D || !D.generatedAt || !D.daily || D.daily.length === 0) {
   document.querySelector('.filter').style.display = 'none';
   throw new Error('No usage data');
 }
+const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtInt = n => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
 const fmtTok = n => n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'k' : String(n||0);
 const fmtUsd = n => '$' + (n || 0).toFixed(2);
@@ -163,17 +164,6 @@ function render() {
   } else {
     daily = aggByAgent(D.daily, agent).filter(r => inRange(r.period, from, to));
   }
-  const weekly = (function buildWeekly() {
-    const m = new Map();
-    for (const r of daily) {
-      const w = isoWeek(r.period);
-      if (!m.has(w)) m.set(w, { period: w, totalTokens: 0, totalCost: 0 });
-      const a = m.get(w);
-      a.totalTokens += r.totalTokens || 0;
-      a.totalCost += r.totalCost || 0;
-    }
-    return [...m.values()].sort((a, b) => a.period.localeCompare(b.period));
-  })();
 
   const totCost = daily.reduce((s,r) => s + (r.totalCost||0), 0);
   const totTok = daily.reduce((s,r) => s + (r.totalTokens||0), 0);
@@ -216,7 +206,7 @@ function render() {
     { label: 'Total tokens',     value: fmtTok(totTok),   sub: (() => { const r = avgDay / 6; const p = r > 67 ? 0.1 : r > 33 ? 0.5 : r > 10 ? 1 : r > 5 ? 3 : r > 2 ? 10 : 25; return `<span style="color:var(--good)">${p}%</span> globally`; })() },
     { label: 'Total cost',       value: fmtUsd(totCost),  sub: `Avg ${fmtUsd(avgDay)}/day` },
     { label: 'Cache efficiency', value: `<span class="metric-${cacheEffColor}">${cacheEff.toFixed(0)}%</span>`, sub: `≥70% <span style="color:var(--good)">●</span> ≥40% <span style="color:var(--warn)">●</span> &lt;40% <span style="color:var(--bad)">●</span>` },
-    { label: 'Cost / 1K output', value: `<span class="metric-${costEffColorEarly}">${fmtUsd(costPer1kOutEarly)}</span>`, sub: `API output rate ${fmtUsd(apiOutPer1kEarly)}/1K &nbsp;·&nbsp; ${overheadMultEarly.toFixed(1)}× overhead` },
+    (() => { const r = totCacheC > 0 ? totCacheR / totCacheC : 0; const color = r >= 10 ? 'good' : r >= 3 ? 'warn' : 'bad'; return { label: 'Cache reuse rate', value: `<span class="metric-${color}">${r.toFixed(0)}×</span>`, sub: `reads / creates &nbsp;·&nbsp; ≥10× <span style="color:var(--good)">●</span> ≥3× <span style="color:var(--warn)">●</span>` }; })(),
   ];
   document.getElementById('cards').innerHTML = cards.map(c =>
     `<div class="card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`
@@ -305,10 +295,8 @@ function render() {
   });
 
 
-  const wkLabels = weekly.map(r => r.period);
-
   const shortProjHtml = p => p
-    ? p.split(/[\\/]/).filter(Boolean).slice(-2).join('/')
+    ? esc(p.split(/[\\/]/).filter(Boolean).slice(-2).join('/'))
     : '<span style="color:var(--muted-2)">—</span>';
 
 
@@ -346,9 +334,9 @@ function render() {
 
   document.getElementById('tblProjects').innerHTML = projects.filter(p => p.totalCost >= 5).slice(0, 30).map(p => `
     <tr>
-      <td title="${p.project}">${shortProjHtml(p.project)}</td>
-      <td>${p.lastActivity || '—'}</td>
-      <td>${p.agents.map(a => `<span class="pill ${a}" style="margin-right:4px">${a}</span>`).join('')}</td>
+      <td title="${esc(p.project)}">${shortProjHtml(p.project)}</td>
+      <td>${esc(p.lastActivity || '—')}</td>
+      <td>${p.agents.map(a => `<span class="pill ${esc(a)}" style="margin-right:4px">${esc(a)}</span>`).join('')}</td>
       <td class="num">${p.sessions}</td>
       <td class="num">${fmtTok(p.totalTokens)}</td>
       <td class="num">${fmtUsd(p.totalCost)}</td>

@@ -48,12 +48,11 @@
 
           switch (evt.type) {
             case "message_start":
-              // Contains model id + input token count
+              // Contains model id + input token count (output_tokens here is 0 or 1, counted in message_delta)
               if (evt.message) {
                 if (evt.message.model) model = evt.message.model;
                 if (evt.message.usage) {
                   inputTokens += evt.message.usage.input_tokens || 0;
-                  outputTokens += evt.message.usage.output_tokens || 0;
                 }
               }
               break;

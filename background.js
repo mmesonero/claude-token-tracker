@@ -244,10 +244,10 @@ async function checkForUpdate() {
 // MV3 service workers don't survive idle, so setInterval is unreliable.
 // chrome.alarms wakes the worker on schedule.
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 1 });
+  chrome.alarms.get(UPDATE_ALARM, a => { if (!a) chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 720 }); });
 });
 chrome.runtime.onStartup.addListener(() => {
-  chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 1 });
+  chrome.alarms.get(UPDATE_ALARM, a => { if (!a) chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 720 }); });
 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === UPDATE_ALARM) checkForUpdate();
