@@ -16,3 +16,6 @@ npm-debug.log*
 # Build artifacts
 *.zip
 dist/
+
+# Generated locally by claude-code-usage — contains private session data
+usage-data.js
