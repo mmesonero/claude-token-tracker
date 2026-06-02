@@ -100,7 +100,7 @@ dashboard.js       Reads liveUsage from storage. Reacts instantly via onChanged.
 
 ```
 claude-token-tracker/
-├── manifest.json         MV3 manifest (v1.3.2)
+├── manifest.json         MV3 manifest (v1.3.3)
 ├── background.js         Service worker
 ├── content.js            Widget + postMessage bridge + API polling
 ├── page-inject.js        Fetch interceptor (page context)

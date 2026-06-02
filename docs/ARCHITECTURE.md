@@ -4,7 +4,7 @@
 
 ```
 claude-token-tracker/
-├── manifest.json          MV3 manifest — permissions, content scripts, action (v1.3.2)
+├── manifest.json          MV3 manifest — permissions, content scripts, action (v1.3.3)
 ├── background.js          Service worker — opens dashboard window, fetches API, message bus, update check
 ├── content.js             Runs on claude.ai — injects widget, calls API, bridges storage
 ├── page-inject.js         Runs in page context — wraps window.fetch (passive listener)
@@ -55,7 +55,7 @@ claude-token-tracker/
            ▼
   ┌─────────────────┐
   │  dashboard.js   │  chrome.storage.onChanged → refresh localStats + render()
-  │  (popup window) │  setInterval REFRESH_USAGE every 60 s
+  │  (popup window) │  REFRESH_USAGE every 60 s, paused while document.hidden
   └─────────────────┘
 ```
 
@@ -92,7 +92,7 @@ claude-token-tracker/
 
   // Update check:
   updateAvailable: false,
-  remoteVersion: "1.3.2"
+  remoteVersion: "1.3.3"
 }
 
 // chrome.storage.session keys:
@@ -147,7 +147,7 @@ claude-token-tracker/
 
 **Update check** — every 12 hours via `chrome.alarms` (not `setInterval` — alarms survive service worker idle restarts). The alarm is created with `chrome.alarms.get` guard to prevent duplicates. Compares versions numerically (not string equality) so older local versions correctly trigger the update banner.
 
-**web_accessible_resources** — `usage.html`, `usage-app.js`, `usage-data.js` and `lib/` are restricted to `chrome-extension://*/*` matches only. External pages cannot fetch these resources.
+**web_accessible_resources** — only `page-inject.js` and `icons/*.png` are exposed (to `https://claude.ai/*`). Internal pages like `usage.html` are opened via `chrome.tabs.create` from the extension's own context, which doesn't require WAR.
 
 **Message listener guard** — `content.js` sets `window.__cttListenerAttached` before adding the `message` event listener, preventing duplicate listeners on SPA re-injections.
 
