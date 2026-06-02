@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Browser extension (Chrome/Chromium MV3) that intercepts streaming API calls on **claude.ai** to measure real-time token consumption, then displays daily and weekly progress bars styled after Anthropic's visual language.
+Browser extension (Chrome/Chromium MV3) that intercepts streaming API calls on **claude.ai** to measure real-time token consumption, then displays daily and weekly progress bars styled after Anthropic's visual language. Also bundles a full-page analytics dashboard for Claude Code usage powered by `ccusage`.
 
 ## Problem
 
@@ -42,9 +42,10 @@ data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"outpu
 
 1. `content.js` injects `page-inject.js` into the **page context** (not the content-script isolated world) via a `<script src>` tag at `document_start`.
 2. `page-inject.js` wraps `window.fetch`, clones any matching SSE response, and parses `message_start` + `message_delta` events.
-3. Token counts are sent back via `window.postMessage({ type: "CLAUDE_TOKEN_USAGE", ... }, origin)`.
-4. `content.js` listens to `window.addEventListener("message")`, validates the source, and forwards via `chrome.runtime.sendMessage({ type: "UPDATE_USAGE", data })`.
-5. `background.js` stores the counts in `chrome.storage.local` keyed by date.
+3. `input_tokens` are taken from `message_start.message.usage`. `output_tokens` are taken **only** from `message_delta.usage` (the final count) — `message_start.output_tokens` is always 0 or 1 and is intentionally ignored to avoid double-counting.
+4. Token counts are sent back via `window.postMessage({ type: "CLAUDE_TOKEN_USAGE", ... }, origin)`.
+5. `content.js` listens to `window.addEventListener("message")` (guarded by `window.__cttListenerAttached` to prevent duplicate listeners on SPA re-injections), validates the source, and forwards via `chrome.runtime.sendMessage({ type: "UPDATE_USAGE", data })`.
+6. `background.js` stores the counts in `chrome.storage.local` keyed by date.
 
 This powers the **options page** stats (all-time total, days with data, export).
 
@@ -57,6 +58,7 @@ This powers the **options page** stats (all-time total, days with data, export).
 | `page-inject.js` | Page-context fetch wrapper — intercepts SSE streams, emits postMessage |
 | `background.js` | Service worker — storage, aggregation, message handler, opens dashboard window |
 | `dashboard.html/js` | Floating window opened on icon click — shows live 5h + weekly usage |
+| `usage.html/usage-app.js` | Metric Dashboard — full-page Claude Code analytics |
 | `options.html/js/css` | Settings page — limit presets, data export/reset |
 
 ## Architecture Decisions
@@ -67,10 +69,24 @@ This powers the **options page** stats (all-time total, days with data, export).
 | Page injection | `web_accessible_resources` + `<script src>` | Only way to override `window.fetch` in page context under MV3 |
 | Communication | `window.postMessage` → content script → `chrome.runtime.sendMessage` | Standard safe cross-context bridge |
 | Storage | `chrome.storage.local` | Persists across browser restarts; sync not needed |
+| Dashboard window ID | `chrome.storage.session` | Survives service worker idle restarts; prevents duplicate popups |
 | Data retention | 30 rolling days | Enough for weekly views, avoids storage bloat |
 | Week start | Monday | ISO standard |
 | Token limits | User-configurable, sane defaults | No public API for plan limits |
 | Dashboard | Floating popup window via `chrome.windows.create` | Better real estate than a browser tab; stays on top |
+| Update alarm | `chrome.alarms` at 720 min | Survives SW idle restarts; `setInterval` is unreliable in MV3 |
+| web_accessible_resources | Restricted to `chrome-extension://*/*` | Prevents external pages from reading usage-data.js (contains private session data) |
+
+## Two-Repo Design
+
+The project is split across two local repos:
+
+| Repo | Visibility | Purpose |
+|---|---|---|
+| `claude-token-tracker` | **Public** (GitHub) | Extension source — no sensitive data |
+| `claude-code-usage` | **Local only** | Build tool — contains `usage-data.js` with real session paths and costs |
+
+`claude-code-usage/build.mjs` generates `usage-data.js` (private), then copies `usage.html`, `usage-app.js`, and `lib/` into the extension folder. `usage-data.js` is gitignored in the public repo. This keeps all session data (project paths, costs, tokens per session) off GitHub.
 
 ## URL Patterns Intercepted
 
@@ -86,7 +102,7 @@ No host filter needed — the script only loads on `https://claude.ai/*` per `we
 | Message type | Direction | Payload |
 |---|---|---|
 | `UPDATE_USAGE` | content → background | `{ model, inputTokens, outputTokens }` |
-| `GET_STATS` | options → background | — |
+| `GET_STATS` | options/dashboard → background | — |
 | `SET_LIMITS` | options → background | `{ daily, weekly }` |
 | `RESET_DATA` | options → background | — |
 | `EXPORT_DATA` | options → background | — |
@@ -101,3 +117,4 @@ No host filter needed — the script only loads on `https://claude.ai/*` per `we
 - **Model attribution** — model comes from `message_start` event
 - **No rate-limit info** — actual plan limits are not exposed by claude.ai; defaults are estimates
 - **Free-tier users** — Anthropic may use message counts, not token counts; progress bar still shows tokens
+- **ccusage schema dependency** — `build.mjs` assumes `daily.daily`, `session.session` key names from ccusage output; pinned to `ccusage@20.0.6` to avoid silent breakage
