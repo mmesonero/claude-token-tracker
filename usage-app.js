@@ -213,8 +213,8 @@ function render() {
   const costEffColorEarly = overheadMultEarly < 5 ? 'good' : overheadMultEarly < 10 ? 'warn' : 'bad';
 
   const cards = [
-    { label: 'Total tokens',     value: fmtTok(totTok),   sub: `in ${fmtTok(totIn)} · out ${fmtTok(totOut)}` },
-    { label: 'Total cost',       value: fmtUsd(totCost),  sub: `${days} days · avg ${fmtUsd(avgDay)}/day` },
+    { label: 'Total tokens',     value: fmtTok(totTok),   sub: (() => { const r = avgDay / 6; const p = r > 67 ? 0.1 : r > 33 ? 0.5 : r > 10 ? 1 : r > 5 ? 3 : r > 2 ? 10 : 25; return `<span style="color:var(--good)">${p}%</span> globally`; })() },
+    { label: 'Total cost',       value: fmtUsd(totCost),  sub: `Avg ${fmtUsd(avgDay)}/day` },
     { label: 'Cache efficiency', value: `<span class="metric-${cacheEffColor}">${cacheEff.toFixed(0)}%</span>`, sub: `≥70% <span style="color:var(--good)">●</span> ≥40% <span style="color:var(--warn)">●</span> &lt;40% <span style="color:var(--bad)">●</span>` },
     { label: 'Cost / 1K output', value: `<span class="metric-${costEffColorEarly}">${fmtUsd(costPer1kOutEarly)}</span>`, sub: `API output rate ${fmtUsd(apiOutPer1kEarly)}/1K &nbsp;·&nbsp; ${overheadMultEarly.toFixed(1)}× overhead` },
   ];
@@ -238,7 +238,7 @@ function render() {
     ]},
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtTok(c.parsed.y) } } },
+      plugins: { legend: { display: true, position: 'bottom', labels: { usePointStyle: true, pointStyle: 'line' } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtTok(c.parsed.y) } } },
       scales: { x: { grid: { color: gridColor } }, y: { grid: { color: gridColor }, ticks: { callback: v => fmtTok(v) } } },
     },
   });
@@ -277,7 +277,23 @@ function render() {
 
   charts.models = new Chart(document.getElementById('cModels'), {
     type: 'doughnut',
-    data: { labels: mEntries.map(e => shortModel(e[0])), datasets: [{ data: mEntries.map(e => e[1]), backgroundColor: palette, borderWidth: 2, borderColor: '#262624' }] },
+    data: {
+      labels: mEntries.map(e => shortModel(e[0])),
+      datasets: [{
+        data: mEntries.map(e => e[1]),
+        backgroundColor: (() => {
+          const counts = {};
+          return mEntries.map(([m]) => {
+            const b = modelBrand(m);
+            counts[b] = (counts[b] || 0);
+            const c = (MODEL_SHADES[b] || MODEL_SHADES.Other)[counts[b] % (MODEL_SHADES[b] || MODEL_SHADES.Other).length];
+            counts[b]++;
+            return c;
+          });
+        })(),
+        borderWidth: 2, borderColor: '#262624',
+      }],
+    },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
