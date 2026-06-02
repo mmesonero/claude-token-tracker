@@ -118,12 +118,18 @@ async function exportData() {
 // ─── Fetch usage directly from background (uses Chrome's cookie store) ───────
 
 async function getOrgId() {
-  // Cookie via chrome.cookies API (most reliable)
+  // Method 1: cookie via chrome.cookies API (most reliable when user has visited claude.ai)
   try {
     const cookie = await chrome.cookies.get({ url: "https://claude.ai", name: "lastActiveOrg" });
     if (cookie?.value) return cookie.value;
   } catch (_) {}
-  return null;
+  // Method 2: bootstrap API fallback — works as long as session cookies exist
+  try {
+    const r = await fetch("https://claude.ai/api/bootstrap", { credentials: "include" });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d?.organization?.uuid || d?.account?.organization_uuid || null;
+  } catch (_) { return null; }
 }
 
 async function fetchLiveUsage() {
@@ -217,8 +223,17 @@ function compareVersion(a, b) {
   return 0;
 }
 
-async function checkForUpdate() {
+// Debounced — only one real network call per 6 h, regardless of how many
+// times the worker wakes (alarm, action click, message, etc.). Prevents
+// hitting raw.githubusercontent.com's anonymous rate limit (60/h per IP).
+const UPDATE_DEBOUNCE_MS = 6 * 3600_000;
+
+async function checkForUpdate({ force = false } = {}) {
   try {
+    if (!force) {
+      const { lastUpdateCheck = 0 } = await chrome.storage.local.get("lastUpdateCheck");
+      if (Date.now() - lastUpdateCheck < UPDATE_DEBOUNCE_MS) return;
+    }
     const r = await fetch(`${REMOTE_MANIFEST}?_=${Date.now()}`); // cache-bust
     if (!r.ok) return;
     const remote = await r.json();
@@ -228,6 +243,7 @@ async function checkForUpdate() {
     await chrome.storage.local.set({
       updateAvailable:  hasUpdate,
       remoteVersion:    remote.version,
+      lastUpdateCheck:  Date.now(),
     });
 
     if (hasUpdate) {
@@ -250,10 +266,8 @@ chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.get(UPDATE_ALARM, a => { if (!a) chrome.alarms.create(UPDATE_ALARM, { periodInMinutes: 720 }); });
 });
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === UPDATE_ALARM) checkForUpdate();
+  if (alarm.name === UPDATE_ALARM) checkForUpdate({ force: true });
 });
-// Also run once at every worker wake-up
-checkForUpdate();
 
 // ─── Message Listener ─────────────────────────────────────────────────────────
 

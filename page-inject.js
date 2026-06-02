@@ -102,7 +102,9 @@
 
       // page-inject.js only runs on claude.ai (web_accessible_resources match),
       // so no need to re-check the host — just match the path patterns.
-      if (matchesClaudeAPI(url)) {
+      // Also gate on Content-Type: only SSE streams carry token usage events.
+      // Filtering here avoids cloning JSON list endpoints (e.g. /chat_conversations).
+      if (matchesClaudeAPI(url) && (response.headers.get("content-type") || "").includes("event-stream")) {
         // Clone so we can consume the stream independently
         // (the real response goes to the page untouched)
         const cloned = response.clone();

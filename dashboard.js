@@ -30,13 +30,17 @@ function fmtCountdown(iso) {
   return m + "m";
 }
 
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
 function prettyModel(name) {
-  return name
+  return escHtml(String(name)
     .replace(/^claude-/, "")
     .replace(/-\d{8}.*$/, "")
     .replace(/-/g, " ")
     .replace(/(\d) (\d)/g, "$1.$2")
-    .replace(/\b\w/g, c => c.toUpperCase());
+    .replace(/\b\w/g, c => c.toUpperCase()));
 }
 
 // ── Live badge ───────────────────────────────────────────────────────────────
@@ -289,9 +293,17 @@ async function init() {
   });
 
   setInterval(async () => {
+    if (document.hidden) return; // skip while the popup window isn't visible
     localStats = await fetchLocalStats();
     requestRefresh();
   }, 60_000);
+
+  // Refresh immediately when the window becomes visible again
+  document.addEventListener("visibilitychange", async () => {
+    if (document.hidden) return;
+    localStats = await fetchLocalStats();
+    requestRefresh();
+  });
 }
 
 init();

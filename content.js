@@ -238,7 +238,11 @@ if (!window.__cttListenerAttached) {
     });
     obs.observe(document.body, { childList: true, subtree: true });
     // Safety: stop observing after 15s if the target DOM never appears
-    const safety = setTimeout(() => obs.disconnect(), 15_000);
+    // (claude.ai redesign likely — widget host selector needs updating)
+    const safety = setTimeout(() => {
+      obs.disconnect();
+      console.warn("[ctt] widget host not found after 15s — selector may be stale");
+    }, 15_000);
   }
 
   if (document.readyState === "loading") {
