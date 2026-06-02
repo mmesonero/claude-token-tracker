@@ -1,4 +1,23 @@
 const D = window.__USAGE__;
+if (!D || !D.generatedAt || !D.daily || D.daily.length === 0) {
+  document.querySelector('main').innerHTML = `
+    <div style="text-align:center;padding:80px 20px;color:var(--muted)">
+      <h2 style="font-family:var(--serif);font-size:22px;color:var(--text);margin-bottom:14px;font-weight:500">No data yet</h2>
+      <p style="font-size:14px;line-height:1.6;max-width:520px;margin:0 auto 24px">
+        This dashboard reads from <code style="background:var(--panel);padding:2px 8px;border-radius:6px">~/.claude/projects/</code> via
+        <a href="https://github.com/ryoppippi/ccusage" target="_blank" style="color:var(--accent)">ccusage</a>.
+        Chrome extensions can't read local files, so the data is generated offline by a build script.
+      </p>
+      <p style="font-size:13px;color:var(--muted-2);max-width:520px;margin:0 auto">
+        Setup: clone <a href="https://github.com/mmesonero/claude-code-usage" target="_blank" style="color:var(--accent)">claude-code-usage</a>,
+        run <code style="background:var(--panel);padding:2px 8px;border-radius:6px">npm start</code>,
+        it writes <code style="background:var(--panel);padding:2px 8px;border-radius:6px">usage-data.js</code> into this extension's folder.
+        Reload the extension to see your data.
+      </p>
+    </div>`;
+  document.querySelector('.filter').style.display = 'none';
+  throw new Error('No usage data');
+}
 const fmtInt = n => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
 const fmtTok = n => n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'k' : String(n||0);
 const fmtUsd = n => '$' + (n || 0).toFixed(2);

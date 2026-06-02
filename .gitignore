@@ -16,3 +16,7 @@ npm-debug.log*
 # Build artifacts
 *.zip
 dist/
+
+# Generated usage data — contains personal Claude Code paths/costs.
+# Build it locally with the claude-code-usage repo: https://github.com/mmesonero/claude-code-usage
+usage-data.js
