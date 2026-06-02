@@ -13,6 +13,7 @@ if (!window.__cttListenerAttached) {
   window.__cttListenerAttached = true;
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
+    if (event.origin !== window.location.origin) return;
     if (!event.data || event.data.type !== "CLAUDE_TOKEN_USAGE") return;
     try {
       chrome.runtime.sendMessage(
@@ -233,9 +234,11 @@ if (!window.__cttListenerAttached) {
   function boot() {
     if (inject()) { updateWidget(); return; }
     const obs = new MutationObserver(() => {
-      if (inject()) { obs.disconnect(); updateWidget(); }
+      if (inject()) { obs.disconnect(); clearTimeout(safety); updateWidget(); }
     });
     obs.observe(document.body, { childList: true, subtree: true });
+    // Safety: stop observing after 15s if the target DOM never appears
+    const safety = setTimeout(() => obs.disconnect(), 15_000);
   }
 
   if (document.readyState === "loading") {

@@ -198,15 +198,22 @@ function render(usage) {
   });
 
   document.querySelectorAll('.card[data-card]').forEach(card => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', async () => {
       const key = card.dataset.card;
       if (expandedCard === key) {
         expandedCard = null;
         card.classList.remove('expanded');
-      } else {
-        document.querySelectorAll('.card.expanded').forEach(c => c.classList.remove('expanded'));
-        expandedCard = key;
-        card.classList.add('expanded');
+        return;
+      }
+      document.querySelectorAll('.card.expanded').forEach(c => c.classList.remove('expanded'));
+      expandedCard = key;
+      card.classList.add('expanded');
+      // Refresh local stats before showing details — they may be stale up to 60 s
+      const fresh = await fetchLocalStats();
+      if (fresh) {
+        localStats = fresh;
+        const { liveUsage } = await chrome.storage.local.get("liveUsage");
+        if (liveUsage) render(liveUsage);
       }
     });
   });
