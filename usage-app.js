@@ -1,3 +1,4 @@
+(function () {
 const D = window.__USAGE__;
 if (!D || !D.generatedAt || !D.daily || D.daily.length === 0) {
   document.querySelector('main').innerHTML = `
@@ -15,8 +16,9 @@ if (!D || !D.generatedAt || !D.daily || D.daily.length === 0) {
         Reload the extension to see your data.
       </p>
     </div>`;
-  document.querySelector('.filter').style.display = 'none';
-  throw new Error('No usage data');
+  const filter = document.querySelector('.filter');
+  if (filter) filter.style.display = 'none';
+  return;
 }
 const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtInt = n => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
@@ -380,3 +382,4 @@ document.getElementById('toggleProjects').addEventListener('click', function () 
   this.textContent = open ? '▼ All projects' : '▲ Hide';
 });
 render();
+})();
